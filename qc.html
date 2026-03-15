@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-TW">
+<html lang="en">
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -17,12 +17,12 @@
          - Left Sidebar: Navigation for logical grouping (Introduction, Cell Metrics Simulator, Advanced Artifacts, Best Practices).
          - Main Content Area: Scrollable sections.
          - Key Feature: An interactive "QC Simulator" in the Cell Metrics section. Users adjust sliders (nFeature, MT%) to see real-time filtering on a mock scatter plot (nCount vs nFeature). This addresses the report's core message that QC is an iterative, visual process.
-         - Artifacts Section: Uses CSS-based conceptual diagrams to explain Doublets and Soup RNA without relying on external images or SVGs. -->
+         - Artifacts Section: Uses CSS-based conceptual diagrams to explain Doublets and Ambient RNA without relying on external images or SVGs. -->
 
     <!-- Visualization & Content Choices: [
          - Overview -> Contextual Text -> Introduce the purpose of QC.
-         - Cell-level Metrics -> Interactive Chart.js Scatter Plot -> Goal: Compare/Interact. Allows users to see the joint distribution of nFeature vs nCount and color them by MT% or Filter Status. Justification: Scatter plots are the industry standard for scRNA-seq QC.
-         - Doublets/Soup -> HTML/CSS shapes -> Goal: Inform/Organize. Visual representations of technical artifacts using pure CSS circles (no SVG constraint met).
+         - Cell-level Metrics -> Interactive Chart.js Scatter Plot -> Goal: Compare/Interact. Allows users to see the joint distribution of nFeature vs nCount and color them by filter status. Justification: Scatter plots are the industry standard for scRNA-seq QC.
+         - Doublets/Ambient RNA -> HTML/CSS shapes -> Goal: Inform/Organize. Visual representations of technical artifacts using pure CSS circles (no SVG constraint met).
          - Threshold Strategies -> Comparison Grid -> Goal: Compare. Clear breakdown of Fixed vs Adaptive (MAD) approaches.
          ] -->
 
@@ -32,7 +32,7 @@
       @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
       body { font-family: 'Inter', sans-serif; }
 
-      /* Strictly control chart container size and responsiveness */
+      /* Strict control of chart container size and responsiveness */
       .chart-container {
         position: relative;
         width: 100%;
@@ -44,13 +44,13 @@
         min-height: 300px;
       }
 
-      /* Hide/style scrollbar */
+      /* Scrollbar styling */
       ::-webkit-scrollbar { width: 6px; height: 6px; }
       ::-webkit-scrollbar-track { background: transparent; }
       ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
       ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 
-      /* Active nav item style */
+      /* Active nav item */
       .nav-item.active {
         background-color: #eff6ff;
         color: #1d4ed8;
@@ -74,10 +74,13 @@
   </head>
   <body class="bg-slate-50 text-slate-800 flex h-screen overflow-hidden selection:bg-blue-200 selection:text-blue-900">
 
-    <!-- Left sidebar navigation (desktop) -->
+    <!-- Desktop sidebar navigation -->
     <aside class="hidden md:flex flex-col w-64 bg-white border-r border-slate-200 h-full flex-shrink-0 z-10 shadow-sm">
       <div class="p-6 border-b border-slate-100">
-        <h1 class="text-xl font-bold text-slate-900 leading-tight">scRNA-seq QC<br><span class="text-blue-600 text-base font-medium">Interactive Analysis Guide</span></h1>
+        <h1 class="text-xl font-bold text-slate-900 leading-tight">
+          scRNA-seq QC<br>
+          <span class="text-blue-600 text-base font-medium">Interactive Guide</span>
+        </h1>
       </div>
       <nav class="flex-1 overflow-y-auto py-4" id="sidebar-nav">
         <a href="#intro" class="nav-item active block px-6 py-3 text-sm text-slate-600 hover:bg-slate-50 transition-colors">Overview and Importance</a>
@@ -87,7 +90,7 @@
         <a href="#strategies" class="nav-item block px-6 py-3 text-sm text-slate-600 hover:bg-slate-50 transition-colors">Threshold Strategies and Best Practices</a>
       </nav>
       <div class="p-4 bg-slate-50 border-t border-slate-200 text-xs text-slate-400 text-center">
-        Generated based on expert analysis report
+        Generated from an expert QC summary
       </div>
     </aside>
 
@@ -99,68 +102,73 @@
           <option value="#intro">Overview and Importance</option>
           <option value="#cell-metrics">Cell-Level Metrics</option>
           <option value="#gene-metrics">Gene-Level Filtering</option>
-          <option value="#artifacts">Advanced QC (Artifacts)</option>
+          <option value="#artifacts">Advanced QC: Artifacts</option>
           <option value="#strategies">Threshold Strategies</option>
         </select>
       </div>
     </div>
 
-    <!-- Main content area -->
+    <!-- Main content -->
     <main class="flex-1 h-full overflow-y-auto pt-16 md:pt-0 scroll-smooth" id="main-content">
       <div class="max-w-5xl mx-auto p-6 md:p-10 lg:p-12 space-y-24 pb-32">
 
-        <!-- Section 1: Overview -->
+        <!-- Section 1 -->
         <section id="intro" class="scroll-mt-8 md:scroll-mt-0">
           <div class="max-w-3xl">
-            <h2 class="text-3xl md:text-4xl font-extrabold text-slate-900 tracking-tight mb-4">A Detailed Guide to<br><span class="text-blue-600">Quality Control (QC)</span> in Single-Cell RNA Sequencing Data Analysis</h2>
+            <h2 class="text-3xl md:text-4xl font-extrabold text-slate-900 tracking-tight mb-4">
+              Understanding <span class="text-blue-600">Quality Control (QC)</span><br>
+              in Single-Cell RNA Sequencing Analysis
+            </h2>
             <p class="text-lg text-slate-600 leading-relaxed mb-6">
-              In the scRNA-seq data analysis workflow, <strong>Quality Control (QC)</strong> is an extremely critical first step. Due to limitations in single-cell capture technology and differences in cell status, raw data often contain a large amount of useless noise, such as dead cells, broken droplets, and doublets.
+              In scRNA-seq analysis, <strong>quality control (QC)</strong> is one of the most important first steps. Because of technical limitations in single-cell capture and biological differences in cell state, raw data often contain substantial noise, including dead cells, broken droplets, empty droplets, and doublets.
             </p>
             <div class="bg-amber-50 border-l-4 border-amber-400 p-4 rounded-r-lg">
               <p class="text-sm text-amber-800">
-                <strong>Why is this important?</strong> Without rigorous QC, these low-quality data can severely interfere with downstream dimensionality reduction, clustering, and differential expression analysis, and may even lead to completely incorrect biological conclusions.
+                <strong>Why does this matter?</strong> Without careful QC, low-quality data can distort downstream dimensionality reduction, clustering, and differential expression analyses, and may ultimately lead to misleading biological interpretations.
               </p>
             </div>
           </div>
         </section>
 
-        <!-- Section 2: Cell-level metrics -->
+        <!-- Section 2 -->
         <section id="cell-metrics" class="scroll-mt-20 md:scroll-mt-10">
           <div class="mb-8">
             <h3 class="text-2xl font-bold text-slate-900 mb-2 border-b border-slate-200 pb-2">I. Core Cell-Level QC Metrics</h3>
-            <p class="text-slate-600 mb-6">Cell-level filtering aims to remove poor-quality <span class="font-medium">cell barcodes</span>. Below is an interactive simulator that allows you to experience how different threshold settings affect the dataset. <strong>Try dragging the sliders below.</strong></p>
+            <p class="text-slate-600 mb-6">
+              Cell-level filtering aims to remove poor-quality <strong>cell barcodes</strong>. The interactive simulator below allows you to explore how different threshold settings influence the dataset. <strong>Try adjusting the sliders.</strong>
+            </p>
 
-            <!-- Interactive metric explanation cards -->
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
               <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
-                <h4 class="font-bold text-slate-800 text-lg mb-1">1. Number of Genes <span class="text-xs font-mono bg-slate-100 px-1 py-0.5 rounded text-slate-500">nFeature_RNA</span></h4>
-                <p class="text-sm text-slate-600">The total number of detected genes in a single cell.<br>
-                  <span class="text-rose-500 font-medium">Too low (&lt;200):</span> Cell rupture or empty droplets.<br>
-                  <span class="text-rose-500 font-medium">Too high:</span> Suggestive of doublets.
+                <h4 class="font-bold text-slate-800 text-lg mb-1">1. Number of Detected Genes <span class="text-xs font-mono bg-slate-100 px-1 py-0.5 rounded text-slate-500">nFeature_RNA</span></h4>
+                <p class="text-sm text-slate-600">
+                  The total number of genes detected in a single cell.<br>
+                  <span class="text-rose-500 font-medium">Too low (&lt;200):</span> often suggests broken cells or empty droplets.<br>
+                  <span class="text-rose-500 font-medium">Too high:</span> may indicate potential doublets.
                 </p>
               </div>
               <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
                 <h4 class="font-bold text-slate-800 text-lg mb-1">2. Total UMI Count <span class="text-xs font-mono bg-slate-100 px-1 py-0.5 rounded text-slate-500">nCount_RNA</span></h4>
-                <p class="text-sm text-slate-600">The total number of measured transcript molecules. It should show a strong positive correlation with gene count.<br>
-                  Abnormally high or low values are often associated with empty droplets or multiple cells.
+                <p class="text-sm text-slate-600">
+                  The total number of transcript molecules detected in a cell. This metric is usually strongly positively correlated with gene count.<br>
+                  Abnormally low or high values often reflect empty droplets or multiplets.
                 </p>
               </div>
               <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow relative overflow-hidden">
                 <div class="absolute top-0 right-0 w-2 h-full bg-rose-400"></div>
-                <h4 class="font-bold text-slate-800 text-lg mb-1">3. Mitochondrial Percentage <span class="text-xs font-mono bg-slate-100 px-1 py-0.5 rounded text-slate-500">MT%</span></h4>
-                <p class="text-sm text-slate-600">The most important metric for evaluating <strong>cell viability and health status</strong>. When cells rupture, mRNA is lost, but mitochondrial RNA tends to remain.<br>
-                  Common threshold: <span class="font-semibold text-slate-800">remove cells with greater than 5%–20%</span>.
+                <h4 class="font-bold text-slate-800 text-lg mb-1">3. Mitochondrial Read Percentage <span class="text-xs font-mono bg-slate-100 px-1 py-0.5 rounded text-slate-500">MT%</span></h4>
+                <p class="text-sm text-slate-600">
+                  One of the most informative indicators of <strong>cell health and viability</strong>. When cells rupture, cytoplasmic mRNA is lost more easily, whereas mitochondrial RNA tends to remain.<br>
+                  A common rule is to remove cells with <span class="font-semibold text-slate-800">more than 5%–20%</span>.
                 </p>
               </div>
             </div>
 
-            <!-- Interactive simulator UI -->
             <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
               <div class="bg-slate-50 px-6 py-4 border-b border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <h4 class="font-bold text-slate-800 flex items-center">
                   <span class="text-xl mr-2">📊</span> QC Scatter Plot Simulator (nCount vs nFeature)
                 </h4>
-                <!-- Status statistics -->
                 <div class="flex gap-4 text-sm font-medium">
                   <div class="px-3 py-1 bg-slate-200 rounded-full text-slate-700">Total: <span id="stat-total">1000</span></div>
                   <div class="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full">Kept: <span id="stat-kept">--</span></div>
@@ -169,46 +177,44 @@
               </div>
 
               <div class="p-6 grid grid-cols-1 lg:grid-cols-4 gap-8">
-                <!-- Control panel -->
                 <div class="lg:col-span-1 space-y-6">
                   <div>
                     <label class="flex justify-between text-sm font-semibold text-slate-700 mb-2">
-                      Minimum Gene Count (Min Feature)
+                      Minimum Gene Count
                       <span id="val-min-gene" class="text-blue-600">200</span>
                     </label>
                     <input type="range" id="slider-min-gene" min="0" max="1000" step="50" value="200" class="w-full accent-blue-600">
-                    <p class="text-xs text-slate-400 mt-1">Filter broken cells / empty droplets</p>
+                    <p class="text-xs text-slate-400 mt-1">Used to remove broken cells or empty droplets</p>
                   </div>
                   <div>
                     <label class="flex justify-between text-sm font-semibold text-slate-700 mb-2">
-                      Maximum Gene Count (Max Feature)
+                      Maximum Gene Count
                       <span id="val-max-gene" class="text-blue-600">4000</span>
                     </label>
                     <input type="range" id="slider-max-gene" min="1000" max="8000" step="100" value="4000" class="w-full accent-blue-600">
-                    <p class="text-xs text-slate-400 mt-1">Filter potential doublets</p>
+                    <p class="text-xs text-slate-400 mt-1">Used to remove potential doublets</p>
                   </div>
                   <div class="pt-4 border-t border-slate-100">
                     <label class="flex justify-between text-sm font-semibold text-slate-700 mb-2">
-                      Maximum Mitochondrial Percentage (Max MT%)
+                      Maximum Mitochondrial Percentage
                       <span id="val-max-mt" class="text-rose-600">10%</span>
                     </label>
                     <input type="range" id="slider-max-mt" min="1" max="50" step="1" value="10" class="w-full accent-rose-500">
-                    <p class="text-xs text-slate-400 mt-1">Filter dead / dying cells</p>
+                    <p class="text-xs text-slate-400 mt-1">Used to remove dead or dying cells</p>
                   </div>
                   <button id="btn-reset" class="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-sm font-medium transition-colors">
-                    Reset thresholds
+                    Reset Thresholds
                   </button>
                 </div>
 
-                <!-- Chart container -->
                 <div class="lg:col-span-3">
                   <div class="chart-container">
                     <canvas id="qcChart"></canvas>
                   </div>
                   <p class="text-center text-xs text-slate-400 mt-4">
-                    X-axis: Total UMI (nCount_RNA) | Y-axis: Gene Count (nFeature_RNA)<br>
-                    <span class="inline-block w-3 h-3 bg-emerald-400 rounded-full mr-1 align-middle"></span> Green dots represent "healthy single cells" that pass the current thresholds.
-                    <span class="inline-block w-3 h-3 bg-rose-400 rounded-full ml-3 mr-1 align-middle"></span> Red dots represent filtered noise.
+                    X-axis: Total UMI count (nCount_RNA) | Y-axis: Number of detected genes (nFeature_RNA)<br>
+                    <span class="inline-block w-3 h-3 bg-emerald-400 rounded-full mr-1 align-middle"></span> Green points indicate cells that pass the current thresholds.
+                    <span class="inline-block w-3 h-3 bg-rose-400 rounded-full ml-3 mr-1 align-middle"></span> Red points indicate cells removed by filtering.
                   </p>
                 </div>
               </div>
@@ -222,28 +228,28 @@
             <div>
               <h3 class="text-2xl font-bold text-slate-900 mb-4 border-b border-slate-200 pb-2">II. Gene-Level QC</h3>
               <p class="text-slate-600 mb-4">
-                In addition to filtering cells, we also need to remove genes that have little analytical value in order to reduce computational burden and statistical noise.
+                In addition to filtering cells, we also remove genes that carry little analytical value. This helps reduce computational burden and suppress statistical noise.
               </p>
               <div class="bg-blue-50 p-4 rounded-lg text-sm text-blue-900">
-                <strong>Filtering extremely lowly expressed genes:</strong><br>
-                A common practice is to remove genes expressed in fewer than 3 cells. These genes are highly likely to be the result of sequencing error or to have expression levels too low to provide meaningful statistical significance in downstream analysis.
+                <strong>Filtering very lowly expressed genes:</strong><br>
+                A common approach is to discard genes detected in fewer than 3 cells. Such genes are often sequencing artifacts or too sparsely expressed to contribute meaningfully to downstream statistical analysis.
               </div>
             </div>
             <div>
-              <h3 class="text-2xl font-bold text-slate-900 mb-4 border-b border-slate-200 pb-2">Other Supporting Cell Metrics</h3>
+              <h3 class="text-2xl font-bold text-slate-900 mb-4 border-b border-slate-200 pb-2">Additional Supporting Metrics</h3>
               <ul class="space-y-4">
                 <li class="flex items-start">
                   <span class="text-xl mr-3">🧬</span>
                   <div>
-                    <strong class="text-slate-800 block">Ribosomal Ratio</strong>
-                    <span class="text-sm text-slate-600">A low ribosomal ratio sometimes suggests poor cell quality, though this metric is less universally useful than mitochondrial percentage (typically based on genes beginning with RPS/RPL).</span>
+                    <strong class="text-slate-800 block">Ribosomal Gene Ratio</strong>
+                    <span class="text-sm text-slate-600">A low ribosomal fraction can sometimes suggest poor cell quality, although this metric is less universally informative than mitochondrial percentage. It is usually calculated from genes beginning with RPS or RPL.</span>
                   </div>
                 </li>
                 <li class="flex items-start">
                   <span class="text-xl mr-3">🩸</span>
                   <div>
-                    <strong class="text-slate-800 block">Hemoglobin Ratio</strong>
-                    <span class="text-sm text-slate-600">For blood or highly vascularized tissues, cells with high HBA/HBB expression are often filtered out unless red blood cells are the focus of the study.</span>
+                    <strong class="text-slate-800 block">Hemoglobin Gene Ratio</strong>
+                    <span class="text-sm text-slate-600">In blood-rich or highly vascularized tissues, cells with excessive HBA or HBB expression are often removed unless red blood cells are part of the biological question.</span>
                   </div>
                 </li>
               </ul>
@@ -253,11 +259,12 @@
 
         <!-- Section 4 -->
         <section id="artifacts" class="scroll-mt-20 md:scroll-mt-10">
-          <h3 class="text-2xl font-bold text-slate-900 mb-2 border-b border-slate-200 pb-2">III. Advanced QC: Handling Technical Artifacts</h3>
-          <p class="text-slate-600 mb-8">Basic threshold filtering cannot solve every problem. Even after removing extreme values, difficult-to-identify artifacts may still remain in the dataset. Modern analysis should therefore include the following advanced steps:</p>
+          <h3 class="text-2xl font-bold text-slate-900 mb-2 border-b border-slate-200 pb-2">III. Advanced QC: Technical Artifacts</h3>
+          <p class="text-slate-600 mb-8">
+            Simple threshold-based filtering does not solve every problem. Even after removing obvious outliers, difficult-to-detect technical artifacts may remain in the dataset. Modern scRNA-seq analysis usually includes the following additional steps:
+          </p>
 
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <!-- Doublet card -->
             <div class="border border-slate-200 rounded-xl p-6 bg-white flex flex-col">
               <div class="flex items-center justify-between mb-4">
                 <h4 class="text-lg font-bold text-slate-800">1. Doublets</h4>
@@ -267,19 +274,18 @@
                 </div>
               </div>
               <p class="text-sm text-slate-600 mb-4 flex-1">
-                Two cells are encapsulated in the same droplet. On UMAP, they may form artificial "transitional states." A simple upper threshold for nCount/nFeature cannot completely remove doublets composed of two small cells.
+                Doublets occur when two cells are captured within the same droplet. In downstream embedding, they may appear as artificial “intermediate” or “transitional” states. A simple upper cutoff for nCount or nFeature cannot reliably eliminate all doublets, especially those formed by two relatively small cells.
               </p>
               <div class="bg-slate-50 p-3 rounded text-sm">
-                <strong class="text-slate-700">Solution:</strong><br>
-                Use algorithms to simulate doublet expression profiles and calculate a probability score for each cell (Doublet Score).<br>
+                <strong class="text-slate-700">Typical solution:</strong><br>
+                Use dedicated algorithms that model doublet-like expression profiles and assign each cell a doublet probability score.<br>
                 <span class="text-xs text-blue-600 font-mono mt-1 block">Common tools: DoubletFinder, Scrublet, scDblFinder</span>
               </div>
             </div>
 
-            <!-- Ambient RNA card -->
             <div class="border border-slate-200 rounded-xl p-6 bg-white flex flex-col">
               <div class="flex items-center justify-between mb-4">
-                <h4 class="text-lg font-bold text-slate-800">2. Ambient RNA (Soup)</h4>
+                <h4 class="text-lg font-bold text-slate-800">2. Ambient RNA Contamination</h4>
                 <div class="cell-circle w-12 h-12 bg-slate-50 border border-slate-300 relative">
                   <div class="nucleus w-4 h-4 bg-emerald-200"></div>
                   <div class="absolute top-2 left-2 w-1 h-1 bg-rose-400 rounded-full"></div>
@@ -288,11 +294,11 @@
                 </div>
               </div>
               <p class="text-sm text-slate-600 mb-4 flex-1">
-                RNA released from ruptured cells enters the suspension and is co-encapsulated into droplets. This can cause cells that should not express a certain gene (for example, T cells) to falsely appear to express it (for example, a hepatocyte-specific gene).
+                Ambient RNA arises when RNA released from ruptured cells contaminates the suspension and is captured together with intact cells. As a result, a cell may appear to express genes that it should not biologically express.
               </p>
               <div class="bg-slate-50 p-3 rounded text-sm">
-                <strong class="text-slate-700">Solution:</strong><br>
-                Estimate the ambient RNA distribution and subtract this contamination from the expression matrix.<br>
+                <strong class="text-slate-700">Typical solution:</strong><br>
+                Estimate the ambient RNA profile and computationally subtract the contamination signal from the expression matrix.<br>
                 <span class="text-xs text-blue-600 font-mono mt-1 block">Common tools: SoupX, CellBender</span>
               </div>
             </div>
@@ -303,7 +309,6 @@
         <section id="strategies" class="scroll-mt-20 md:scroll-mt-10">
           <h3 class="text-2xl font-bold text-slate-900 mb-6 border-b border-slate-200 pb-2">IV. QC Threshold Strategies and Best Practices</h3>
 
-          <!-- Comparison table -->
           <div class="overflow-hidden rounded-xl border border-slate-200 mb-8 shadow-sm">
             <table class="w-full text-left text-sm">
               <thead>
@@ -316,44 +321,43 @@
               <tbody class="bg-white divide-y divide-slate-100 text-slate-600">
                 <tr>
                   <td class="p-4 font-medium text-slate-800">Concept</td>
-                  <td class="p-4 border-l border-slate-200">Uses subjective hard cutoffs (for example, MT% &lt; 5%)</td>
-                  <td class="p-4 border-l border-slate-200">Determined based on the data distribution (data-driven)</td>
+                  <td class="p-4 border-l border-slate-200">Uses manually chosen hard cutoffs, such as MT% &lt; 5%</td>
+                  <td class="p-4 border-l border-slate-200">Determines cutoffs from the observed data distribution</td>
                 </tr>
                 <tr>
-                  <td class="p-4 font-medium text-slate-800">Common Method</td>
-                  <td class="p-4 border-l border-slate-200">Conventional thresholds from the literature</td>
+                  <td class="p-4 font-medium text-slate-800">Common Approach</td>
+                  <td class="p-4 border-l border-slate-200">Rule-of-thumb thresholds from previous literature</td>
                   <td class="p-4 border-l border-slate-200"><strong>Median Absolute Deviation (MAD)</strong>: median + 3 × MAD</td>
                 </tr>
                 <tr>
-                  <td class="p-4 font-medium text-slate-800">Disadvantage / Advantage</td>
-                  <td class="p-4 border-l border-slate-200 text-rose-600 bg-rose-50/30">Highly error-prone in multi-sample integration or special tissue analyses.</td>
-                  <td class="p-4 border-l border-slate-200 text-emerald-700 bg-emerald-50/30">More robust to extreme values and better able to adapt to quality differences between samples (for example, <code class="text-xs">isOutlier()</code> in scater).</td>
+                  <td class="p-4 font-medium text-slate-800">Weakness / Strength</td>
+                  <td class="p-4 border-l border-slate-200 text-rose-600 bg-rose-50/30">Can be error-prone in multi-sample integration or unusual tissue contexts.</td>
+                  <td class="p-4 border-l border-slate-200 text-emerald-700 bg-emerald-50/30">More robust to outliers and better able to adapt to sample-specific quality differences, for example with <code class="text-xs">isOutlier()</code> in scater.</td>
                 </tr>
               </tbody>
             </table>
           </div>
 
-          <!-- Best practices list -->
           <div class="bg-slate-800 rounded-xl p-8 text-slate-200 shadow-md">
             <h4 class="text-xl font-bold text-white mb-6 flex items-center">
-              <span class="text-amber-400 mr-2">💡</span> Core Expert Recommendations
+              <span class="text-amber-400 mr-2">💡</span> Key Practical Recommendations
             </h4>
             <ul class="space-y-4">
               <li class="flex items-start">
                 <div class="flex-shrink-0 w-6 h-6 rounded-full bg-slate-700 flex items-center justify-center text-sm font-bold text-blue-400 mt-0.5 mr-3">1</div>
-                <p><strong>There is no universal threshold:</strong> QC must be adjusted according to your species, tissue type (for example, cardiomyocytes naturally have higher mitochondrial content), and sequencing platform. Always inspect violin plots and scatter plots.</p>
+                <p><strong>There is no universal cutoff:</strong> QC should always be adjusted according to species, tissue type, and sequencing platform. For example, some tissues naturally show higher mitochondrial content. Always inspect the actual distribution with violin plots and scatter plots.</p>
               </li>
               <li class="flex items-start">
                 <div class="flex-shrink-0 w-6 h-6 rounded-full bg-slate-700 flex items-center justify-center text-sm font-bold text-blue-400 mt-0.5 mr-3">2</div>
-                <p><strong>Joint distributions are more informative than single metrics:</strong> As shown in the interactive plot above, good cells should lie roughly along the diagonal; cells deviating from this pattern are often problematic.</p>
+                <p><strong>Joint distributions are more informative than any single metric:</strong> As shown in the interactive plot above, high-quality cells often follow a diagonal trend between nCount and nFeature. Cells deviating strongly from that pattern are often problematic.</p>
               </li>
               <li class="flex items-start">
                 <div class="flex-shrink-0 w-6 h-6 rounded-full bg-slate-700 flex items-center justify-center text-sm font-bold text-blue-400 mt-0.5 mr-3">3</div>
-                <p><strong>Be slightly permissive rather than over-filtering:</strong> Excessively strict filtering may remove rare cell subpopulations, such as quiescent cells.</p>
+                <p><strong>Avoid over-filtering:</strong> Very stringent thresholds may remove rare but biologically meaningful populations, such as quiescent or metabolically distinct cells.</p>
               </li>
               <li class="flex items-start">
                 <div class="flex-shrink-0 w-6 h-6 rounded-full bg-slate-700 flex items-center justify-center text-sm font-bold text-blue-400 mt-0.5 mr-3">4</div>
-                <p><strong>Treat QC as an iterative process:</strong> After initial permissive clustering, if a cluster shows high mitochondrial percentage and lacks specific markers, you can return to the QC step and remove it.</p>
+                <p><strong>Treat QC as an iterative process:</strong> After an initial round of permissive filtering and clustering, you may identify clusters with high mitochondrial content and no clear biological markers, and then return to refine the QC step.</p>
               </li>
             </ul>
           </div>
@@ -372,12 +376,10 @@
         const navMobile = document.getElementById('mobile-nav');
         const mainContent = document.getElementById('main-content');
 
-        // Scroll listener (highlight current section)
         mainContent.addEventListener('scroll', () => {
           let current = '';
           sections.forEach(section => {
             const sectionTop = section.offsetTop;
-            // Add a small offset tolerance
             if (mainContent.scrollTop >= sectionTop - 100) {
               current = section.getAttribute('id');
             }
@@ -393,7 +395,6 @@
           if (current) navMobile.value = `#${current}`;
         });
 
-        // Mobile navigation jump
         navMobile.addEventListener('change', (e) => {
           const targetId = e.target.value.substring(1);
           const targetEl = document.getElementById(targetId);
@@ -403,43 +404,36 @@
         });
 
         // --- Interactive QC simulator logic ---
-
-        // 1. Generate mock data (simulate real scRNA-seq distribution)
         const TOTAL_CELLS = 800;
         const mockData = [];
 
         for (let i = 0; i < TOTAL_CELLS; i++) {
-          // Most are normal cells
           let type = 'normal';
           let rand = Math.random();
 
-          if (rand < 0.15) type = 'dead'; // 15% dead/broken
-          else if (rand > 0.90) type = 'doublet'; // 10% doublets
-          else if (rand > 0.85) type = 'empty'; // 5% empty droplets/noise
+          if (rand < 0.15) type = 'dead';
+          else if (rand > 0.90) type = 'doublet';
+          else if (rand > 0.85) type = 'empty';
 
           let nFeature, nCount, mtPercent;
 
           switch(type) {
             case 'normal':
-              // nFeature usually 1000 - 3500, nCount about 2-3x nFeature
               nFeature = 800 + Math.random() * 2700;
               nCount = nFeature * (1.5 + Math.random() * 2);
-              mtPercent = Math.random() * 8; // 0-8%
+              mtPercent = Math.random() * 8;
               break;
             case 'dead':
-              // Low gene count, but very high MT percentage
               nFeature = 200 + Math.random() * 800;
               nCount = nFeature * (1.2 + Math.random() * 1);
-              mtPercent = 10 + Math.random() * 30; // 10-40%
+              mtPercent = 10 + Math.random() * 30;
               break;
             case 'doublet':
-              // Abnormally high gene count and count
               nFeature = 3500 + Math.random() * 3500;
               nCount = nFeature * (2.5 + Math.random() * 3);
               mtPercent = Math.random() * 5;
               break;
             case 'empty':
-              // Extremely low signal
               nFeature = 50 + Math.random() * 150;
               nCount = nFeature * 1.1;
               mtPercent = Math.random() * 15;
@@ -450,11 +444,10 @@
             x: nCount,
             y: nFeature,
             mt: mtPercent,
-            originalType: type // For reference only; chart coloring depends on thresholds
+            originalType: type
           });
         }
 
-        // 2. Instantiate Chart.js
         const ctx = document.getElementById('qcChart').getContext('2d');
         const qcChart = new Chart(ctx, {
           type: 'scatter',
@@ -485,12 +478,12 @@
             },
             scales: {
               x: {
-                title: { display: true, text: 'nCount_RNA (Total UMI)', color: '#64748b' },
+                title: { display: true, text: 'nCount_RNA (Total UMI Count)', color: '#64748b' },
                 grid: { color: '#f1f5f9' },
                 ticks: { color: '#94a3b8' }
               },
               y: {
-                title: { display: true, text: 'nFeature_RNA (Gene Count)', color: '#64748b' },
+                title: { display: true, text: 'nFeature_RNA (Number of Detected Genes)', color: '#64748b' },
                 grid: { color: '#f1f5f9' },
                 ticks: { color: '#94a3b8' }
               }
@@ -498,7 +491,6 @@
           }
         });
 
-        // 3. Bind UI elements
         const slMinGene = document.getElementById('slider-min-gene');
         const slMaxGene = document.getElementById('slider-max-gene');
         const slMaxMT = document.getElementById('slider-max-mt');
@@ -513,13 +505,11 @@
 
         statTotal.textContent = TOTAL_CELLS;
 
-        // 4. Update logic
         function updateQC() {
           const minG = parseFloat(slMinGene.value);
           const maxG = parseFloat(slMaxGene.value);
           const maxM = parseFloat(slMaxMT.value);
 
-          // Update text display
           valMinGene.textContent = minG;
           valMaxGene.textContent = maxG;
           valMaxMT.textContent = maxM + '%';
@@ -528,7 +518,6 @@
           let filterCount = 0;
           const colors = [];
 
-          // Evaluate each point based on thresholds
           mockData.forEach(cell => {
             const isKept = (cell.y >= minG) && (cell.y <= maxG) && (cell.mt <= maxM);
 
@@ -548,12 +537,10 @@
           statFiltered.textContent = filterCount;
         }
 
-        // Listen to sliders
         [slMinGene, slMaxGene, slMaxMT].forEach(slider => {
           slider.addEventListener('input', updateQC);
         });
 
-        // Reset button
         document.getElementById('btn-reset').addEventListener('click', () => {
           slMinGene.value = 200;
           slMaxGene.value = 4000;
@@ -561,7 +548,6 @@
           updateQC();
         });
 
-        // Initial trigger
         updateQC();
       });
     </script>
