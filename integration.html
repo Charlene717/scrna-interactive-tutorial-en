@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+  <html lang="zh-TW" class="scroll-smooth">
+    <head>
+    <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>scRNA-seq 批次效應校正互動指南</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+          <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+            <style>
+            body {
+              font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+              background-color: #f8fafc;
+                color: #1e293b;
+            }
+          .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 800px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 400px;
+            max-height: 450px;
+          }
+          @media (max-width: 640px) {
+            .chart-container {
+              height: 300px;
+            }
+          }
+          .glass-panel {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+          }
+          .tab-active {
+            border-bottom: 2px solid #3b82f6;
+            color: #2563eb;
+              font-weight: 600;
+          }
+          .timeline-line::before {
+            content: '';
+            position: absolute;
+            left: 1.25rem;
+            top: 2rem;
+            bottom: -2rem;
+            width: 2px;
+            background-color: #e2e8f0;
+              z-index: -1;
+          }
+          .timeline-item:last-child .timeline-line::before {
+            display: none;
+          }
+          </style>
+            </head>
+            <body class="antialiased">
+            
+            <!-- Chosen Palette: Slate (Neutrals) + Blue/Indigo (Accents for scientific trust) -->
+            <!-- Application Structure Plan: The SPA is structured into a linear but interactive narrative. 1. Introduction & Interactive Problem Definition (Users toggle a UMAP simulation to immediately 'see' what a batch effect is). 2. Algorithm Explorer (Tabbed interface for MNN, Harmony, scVI to prevent information overload). 3. Standard Workflow (Vertical timeline for process understanding). 4. Evaluation & Best Practices (Grid layout for quick reference of metrics and warnings). This structure moves from 'Why' to 'How' to 'Verification', mirroring a real data analysis mindset. -->
+            <!-- Visualization & Content Choices: 
+            1. Goal: Compare/Demonstrate Batch Effects -> Method: Chart.js Interactive Scatter Plot -> Interaction: Toggle between 'Raw' and 'Corrected' -> Justification: Visualizing UMAP clustering is the standard way biologists understand this issue. No SVG used.
+          2. Goal: Organize Algorithm Info -> Method: Dynamic Tabbed HTML Panel -> Interaction: Click tabs -> Justification: Condenses text-heavy comparisons into bite-sized, explorable chunks.
+          3. Goal: Process Flow -> Method: HTML/Tailwind Timeline -> Interaction: Hover highlights -> Justification: Linear workflows are best represented as step-by-step paths. No Mermaid used.
+          -->
+            <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+            
+            <nav class="fixed top-0 w-full z-50 glass-panel shadow-sm border-b border-slate-200">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16 items-center">
+            <div class="flex items-center gap-2">
+            <span class="text-2xl">🧬</span>
+            <span class="font-bold text-xl tracking-tight text-slate-800">scRNA-seq 整合中心</span>
+            </div>
+            <div class="hidden md:flex space-x-8">
+            <a href="#problem" class="text-sm font-medium text-slate-600 hover:text-blue-600 transition-colors">認識批次效應</a>
+            <a href="#algorithms" class="text-sm font-medium text-slate-600 hover:text-blue-600 transition-colors">主流演算法</a>
+            <a href="#workflow" class="text-sm font-medium text-slate-600 hover:text-blue-600 transition-colors">標準工作流</a>
+            <a href="#evaluation" class="text-sm font-medium text-slate-600 hover:text-blue-600 transition-colors">評估與建議</a>
+            </div>
+            </div>
+            </div>
+            </nav>
+            
+            <main class="pt-24 pb-16">
+            <section id="hero" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-20 text-center">
+            <h1 class="text-4xl md:text-5xl font-extrabold text-slate-900 mb-6 leading-tight">單細胞轉錄組定序<br><span class="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">批次效應校正技術指南</span></h1>
+            <p class="mt-4 max-w-2xl mx-auto text-lg text-slate-600">在合併來自不同實驗日期、操作者或定序平台的數據時，技術噪音往往會掩蓋真實的生物學差異。本指南將帶您探索如何識別、校正並評估這些批次效應。</p>
+            </section>
+            
+            <section id="problem" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-24">
+            <div class="mb-10">
+            <h2 class="text-3xl font-bold text-slate-800 mb-4 border-l-4 border-blue-500 pl-4">為什麼需要校正？</h2>
+            <p class="text-slate-600 text-lg">本區塊旨在讓您直觀理解批次效應的危害。單細胞數據具有高維度與高稀疏性。當存在批次效應時，相同類型的細胞會按「樣本來源」聚類，而非「細胞類型」。請使用下方的互動按鈕，觀察校正前後在 UMAP 降維圖上的差異。</p>
+            </div>
+            
+            <div class="bg-white rounded-2xl shadow-lg border border-slate-100 p-6 md:p-8 flex flex-col items-center">
+            <div class="flex flex-col sm:flex-row gap-4 mb-8 justify-center w-full">
+            <button id="btn-raw" class="px-6 py-3 rounded-lg font-semibold text-white bg-slate-800 hover:bg-slate-700 transition-all shadow-md active:scale-95">
+            🔬 查看原始數據 (存在批次效應)
+          </button>
+            <button id="btn-corrected" class="px-6 py-3 rounded-lg font-semibold text-blue-700 bg-blue-100 hover:bg-blue-200 border border-blue-300 transition-all shadow-md active:scale-95">
+            ✨ 查看校正後數據 (消除技術噪音)
+          </button>
+            </div>
+            
+            <div class="w-full flex justify-between px-4 mb-2 max-w-3xl text-sm font-medium text-slate-500">
+            <span id="chart-status" class="text-red-500 font-bold">當前狀態：聚類異常 (按批次分離)</span>
+            <span>形狀：細胞類型 (圓形/三角形) | 顏色：樣本批次</span>
+            </div>
+            
+            <div class="chart-container">
+            <canvas id="umapChart"></canvas>
+            </div>
+            
+            <div class="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-4xl">
+            <div class="bg-red-50 border border-red-100 p-5 rounded-xl">
+            <h3 class="font-bold text-red-800 flex items-center gap-2 mb-2"><span>⚠️</span> 未校正的風險</h3>
+            <ul class="list-disc list-inside text-slate-700 space-y-2 text-sm">
+            <li><strong>聚類異常</strong>：同類細胞被強行分開。</li>
+            <li><strong>偽差異基因</strong>：組間比對找到的其實是技術偏差。</li>
+            <li><strong>錯誤的細胞群注釋</strong>：導致後續生物學結論完全偏離。</li>
+            </ul>
+            </div>
+            <div class="bg-emerald-50 border border-emerald-100 p-5 rounded-xl">
+            <h3 class="font-bold text-emerald-800 flex items-center gap-2 mb-2"><span>✅</span> 校正後的目標</h3>
+            <ul class="list-disc list-inside text-slate-700 space-y-2 text-sm">
+            <li><strong>保留生物學結構</strong>：真正的細胞類型應聚在一起。</li>
+            <li><strong>消除技術偏差</strong>：不同批次的同類細胞應均勻混合。</li>
+            <li><strong>提升下游分析準確度</strong>：確保軌跡推斷、差異表達分析的可靠性。</li>
+            </ul>
+            </div>
+            </div>
+            </div>
+            </section>
+            
+            <section id="algorithms" class="bg-slate-50 py-20 border-y border-slate-200">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="mb-12">
+            <h2 class="text-3xl font-bold text-slate-800 mb-4 border-l-4 border-indigo-500 pl-4">主流校正演算法與原理</h2>
+            <p class="text-slate-600 text-lg">本區塊介紹學界公認效果較佳的三大類方法。根據您的數據規模與整合需求，選擇合適的演算法是成功的關鍵。點擊下方頁籤以切換不同的演算法詳情。</p>
+            </div>
+            
+            <div class="flex flex-col md:flex-row gap-8">
+            <div class="w-full md:w-1/3 flex flex-col gap-2">
+            <button class="algo-tab tab-active text-left px-6 py-4 rounded-xl font-medium transition-all bg-white shadow-sm border border-slate-200" data-target="mnn">
+            <div class="text-lg mb-1">基於互鄰近錨點</div>
+            <div class="text-sm font-normal text-slate-500">MNN (如 Seurat CCA/RPCA)</div>
+            </button>
+            <button class="algo-tab text-left px-6 py-4 rounded-xl font-medium transition-all hover:bg-white/50 text-slate-600" data-target="linear">
+            <div class="text-lg mb-1">線性整合與投影</div>
+            <div class="text-sm font-normal text-slate-500">Linear Integration (如 Harmony)</div>
+            </button>
+            <button class="algo-tab text-left px-6 py-4 rounded-xl font-medium transition-all hover:bg-white/50 text-slate-600" data-target="dl">
+            <div class="text-lg mb-1">深度神經網絡 (VAE)</div>
+            <div class="text-sm font-normal text-slate-500">Deep Learning (如 scVI)</div>
+            </button>
+            </div>
+            
+            <div class="w-full md:w-2/3">
+            <div id="content-mnn" class="algo-content bg-white p-8 rounded-2xl shadow-lg border border-slate-100 h-full">
+            <div class="flex items-center gap-3 mb-4">
+            <span class="text-3xl">⚓</span>
+            <h3 class="text-2xl font-bold text-slate-800">互鄰近錨點 (MNN)</h3>
+            </div>
+            <div class="inline-block px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-semibold mb-6">推薦場景：中等數據量，常規分析</div>
+            
+            <div class="space-y-6 text-slate-600">
+            <div>
+            <h4 class="font-bold text-slate-800 mb-2">代表工具</h4>
+            <code class="bg-slate-100 px-2 py-1 rounded text-pink-600">Seurat v3/v4 (CCA/RPCA)</code>, <code class="bg-slate-100 px-2 py-1 rounded text-pink-600">mmnpy</code>, <code class="bg-slate-100 px-2 py-1 rounded text-pink-600">batchelor</code>
+            </div>
+            <div>
+            <h4 class="font-bold text-slate-800 mb-2">演算法原理</h4>
+            <p>在不同批次間尋找「彼此互為最近鄰」的細胞對作為「錨點」（Anchors）。假設這些錨點細胞屬於同一類型，計算它們之間的向量位移，並將此位移應用於全體細胞，從而實現空間對齊。</p>
+            </div>
+            <div>
+            <h4 class="font-bold text-slate-800 mb-2">核心優勢</h4>
+            <p class="flex items-start gap-2"><span class="text-green-500">✓</span> 不依賴細胞類型預標註。</p>
+            <p class="flex items-start gap-2"><span class="text-green-500">✓</span> 能較好地保留生物學結構，適用於批次間細胞組成有差異的情況。</p>
+            </div>
+            </div>
+            </div>
+            
+            <div id="content-linear" class="algo-content bg-white p-8 rounded-2xl shadow-lg border border-slate-100 h-full hidden">
+            <div class="flex items-center gap-3 mb-4">
+            <span class="text-3xl">⚡</span>
+            <h3 class="text-2xl font-bold text-slate-800">線性整合與投影</h3>
+            </div>
+            <div class="inline-block px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-sm font-semibold mb-6">推薦場景：數十萬至百萬級大型數據集</div>
+            
+            <div class="space-y-6 text-slate-600">
+            <div>
+            <h4 class="font-bold text-slate-800 mb-2">代表工具</h4>
+            <code class="bg-slate-100 px-2 py-1 rounded text-pink-600">Harmony</code>
+            </div>
+            <div>
+            <h4 class="font-bold text-slate-800 mb-2">演算法原理</h4>
+            <p>在主成分分析（PCA）的低維空間中進行迭代聚類。演算法會計算每個細胞屬於各聚類的概率，並根據批次分佈計算懲罰因子。它會將細胞向中心移動，直到不同批次在同一個聚類中心內達到最大混合，同時最小化對原始結構的改動。</p>
+            </div>
+            <div>
+            <h4 class="font-bold text-slate-800 mb-2">核心優勢</h4>
+            <p class="flex items-start gap-2"><span class="text-green-500">✓</span> 運算速度極快，內存消耗低。</p>
+            <p class="flex items-start gap-2"><span class="text-green-500">✓</span> 在保持局部結構特徵和批次混合之間取得了優異的平衡。</p>
+            </div>
+            </div>
+            </div>
+            
+            <div id="content-dl" class="algo-content bg-white p-8 rounded-2xl shadow-lg border border-slate-100 h-full hidden">
+            <div class="flex items-center gap-3 mb-4">
+            <span class="text-3xl">🧠</span>
+            <h3 class="text-2xl font-bold text-slate-800">深度神經網絡 (VAE)</h3>
+            </div>
+            <div class="inline-block px-3 py-1 bg-emerald-100 text-emerald-800 rounded-full text-sm font-semibold mb-6">推薦場景：多組學整合、需數據填補的複雜項目</div>
+            
+            <div class="space-y-6 text-slate-600">
+            <div>
+            <h4 class="font-bold text-slate-800 mb-2">代表工具</h4>
+            <code class="bg-slate-100 px-2 py-1 rounded text-pink-600">scVI</code> (Single-cell Variational Inference)
+          </div>
+            <div>
+            <h4 class="font-bold text-slate-800 mb-2">演算法原理</h4>
+            <p>利用生成模型學習數據的底層概率分佈。模型會將「批次標籤」作為一個協變量輸入，通過編碼器神經網絡學習一個不受批次影響的潛在低維表徵（Latent Space），隨後利用解碼器重建數據。</p>
+            </div>
+            <div>
+            <h4 class="font-bold text-slate-800 mb-2">核心優勢</h4>
+            <p class="flex items-start gap-2"><span class="text-green-500">✓</span> 能同時處理批次校正、降噪和缺失值填補（Imputation）。</p>
+            <p class="flex items-start gap-2"><span class="text-green-500">✓</span> 概率框架適合處理極度稀疏的原始計數數據。</p>
+            </div>
+            </div>
+            </div>
+            </div>
+            </div>
+            </div>
+            </section>
+            
+            <section id="workflow" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+            <div class="mb-12 text-center">
+            <h2 class="text-3xl font-bold text-slate-800 mb-4 inline-block relative">
+            標準分析工作流
+          <div class="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-blue-400 to-indigo-500 -mb-2"></div>
+            </h2>
+            <p class="text-slate-600 text-lg max-w-2xl mx-auto mt-6">理解將原始數據轉換為可分析狀態的步驟。此流程圖展示了批次校正介入的確切時間點。</p>
+            </div>
+            
+            <div class="max-w-3xl mx-auto relative pl-6">
+            <div class="timeline-item relative mb-12 pl-10 group">
+            <div class="timeline-line absolute left-0 top-0 h-full flex items-start justify-center pt-2">
+            <div class="w-6 h-6 rounded-full border-4 border-white bg-blue-500 shadow transition-transform group-hover:scale-125"></div>
+            </div>
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 transition-all group-hover:shadow-md group-hover:border-blue-300">
+            <h3 class="text-xl font-bold text-slate-800 mb-2">步驟 1：獨立預處理</h3>
+            <p class="text-slate-600">對每個批次的數據<strong>獨立</strong>進行品質控制（QC，過濾死細胞/雙細胞）、標準化（Normalization）和高變基因篩選（HVG selection）。</p>
+            </div>
+            </div>
+            
+            <div class="timeline-item relative mb-12 pl-10 group">
+            <div class="timeline-line absolute left-0 top-0 h-full flex items-start justify-center pt-2">
+            <div class="w-6 h-6 rounded-full border-4 border-white bg-indigo-500 shadow transition-transform group-hover:scale-125"></div>
+            </div>
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 transition-all group-hover:shadow-md group-hover:border-indigo-300">
+            <h3 class="text-xl font-bold text-slate-800 mb-2">步驟 2：識別共同特徵</h3>
+            <p class="text-slate-600">整合各批次資訊，選取在所有批次中均表現出高變異性的基因子集（通常建議選取 2000-3000 個共有高變基因），以此作為整合的基礎空間。</p>
+            </div>
+            </div>
+            
+            <div class="timeline-item relative mb-12 pl-10 group">
+            <div class="timeline-line absolute left-0 top-0 h-full flex items-start justify-center pt-2">
+            <div class="w-6 h-6 rounded-full border-4 border-white bg-purple-500 shadow transition-transform group-hover:scale-125"></div>
+            </div>
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 transition-all group-hover:shadow-md group-hover:border-purple-300">
+            <h3 class="text-xl font-bold text-slate-800 mb-2">步驟 3：執行整合校正</h3>
+            <p class="text-slate-600">運行您選擇的校正演算法（如 Seurat CCA, Harmony, 或 scVI）。此步驟將計算整合矩陣或低維空間嵌入（Embeddings）。</p>
+            </div>
+            </div>
+            
+            <div class="timeline-item relative pl-10 group">
+            <div class="timeline-line absolute left-0 top-0 h-full flex items-start justify-center pt-2">
+            <div class="w-6 h-6 rounded-full border-4 border-white bg-emerald-500 shadow transition-transform group-hover:scale-125"></div>
+            </div>
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 transition-all group-hover:shadow-md group-hover:border-emerald-300">
+            <h3 class="text-xl font-bold text-slate-800 mb-2">步驟 4：降維可視化與聚類</h3>
+            <p class="text-slate-600">基於校正後的低維空間運行 UMAP 或 t-SNE 進行可視化。後續的細胞分群（Clustering）也必須基於此校正後的空間進行。</p>
+            </div>
+            </div>
+            </div>
+            </section>
+            
+            <section id="evaluation" class="bg-slate-900 text-white py-20 mt-10">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="mb-12">
+            <h2 class="text-3xl font-bold mb-4 border-l-4 border-emerald-400 pl-4">評估校正效果與注意事項</h2>
+            <p class="text-slate-300 text-lg max-w-3xl">校正並非「越強越好」，過度校正（Over-correction）會抹除真實的生物差異。了解如何科學地評估您的整合結果。</p>
+            </div>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-10">
+            <div>
+            <h3 class="text-2xl font-semibold mb-6 flex items-center gap-2"><span class="text-emerald-400">📊</span> 定量評估指標</h3>
+            <div class="space-y-4">
+            <div class="bg-slate-800 p-5 rounded-lg border border-slate-700">
+            <div class="flex justify-between items-center mb-2">
+            <h4 class="font-bold text-lg text-blue-300">LISI</h4>
+            <span class="text-xs font-mono bg-slate-700 px-2 py-1 rounded">Local Inverse Simpson Index</span>
+            </div>
+            <p class="text-slate-400 text-sm">衡量局部領域內批次混合程度的指標。數值越接近批次總數，代表局部混合越均勻。</p>
+            </div>
+            <div class="bg-slate-800 p-5 rounded-lg border border-slate-700">
+            <div class="flex justify-between items-center mb-2">
+            <h4 class="font-bold text-lg text-blue-300">ASW</h4>
+            <span class="text-xs font-mono bg-slate-700 px-2 py-1 rounded">Average Silhouette Width</span>
+            </div>
+            <p class="text-slate-400 text-sm">計算批次標籤的輪廓係數。數值越低代表批次間越難區分，即混合效果越好（注意與評估細胞聚類時的 ASW 邏輯相反）。</p>
+            </div>
+            <div class="bg-slate-800 p-5 rounded-lg border border-slate-700">
+            <div class="flex justify-between items-center mb-2">
+            <h4 class="font-bold text-lg text-blue-300">kBET</h4>
+            <span class="text-xs font-mono bg-slate-700 px-2 py-1 rounded">k-nearest neighbor Batch Effect Test</span>
+            </div>
+            <p class="text-slate-400 text-sm">統計學檢驗方法。評估各局部區域的批次分佈比例是否符合全體數據的分佈比例，拒絕率越低代表混合越好。</p>
+            </div>
+            </div>
+            </div>
+            
+            <div>
+            <h3 class="text-2xl font-semibold mb-6 flex items-center gap-2"><span class="text-amber-400">💡</span> 核心警告與最佳實踐</h3>
+            <div class="grid grid-cols-1 gap-4">
+            <div class="bg-slate-800 p-6 rounded-lg border-l-4 border-amber-500">
+            <h4 class="font-bold text-amber-400 mb-2">絕對不要校正差異基因 (DEGs) 的計數矩陣</h4>
+            <p class="text-slate-300 text-sm">批次校正生成的矩陣僅能用於降維、聚類和可視化。在進行差異表達分析（如 DESeq2, FindMarkers）時，<strong class="text-white underline">必須使用原始計數數據 (Raw Counts)</strong>，並將批次資訊作為回歸協變量加入模型中（例如設置 <code>latent.vars = "batch"</code>）。</p>
+            </div>
+            <div class="bg-slate-800 p-6 rounded-lg border-l-4 border-pink-500">
+            <h4 class="font-bold text-pink-400 mb-2">區分「批次」與「生物條件」的混淆</h4>
+            <p class="text-slate-300 text-sm">如果批次與生物學分組完全重疊（例如：批次A全是健康人，批次B全是病人），強制整合可能會將疾病特徵作為批次效應抹除。實驗設計初期應確保不同生物條件均勻分佈在各個定序批次中。</p>
+            </div>
+            <div class="bg-slate-800 p-6 rounded-lg border-l-4 border-blue-500">
+            <h4 class="font-bold text-blue-400 mb-2">定性評估：標誌基因 (Marker Genes) 檢查</h4>
+            <p class="text-slate-300 text-sm">在 UMAP 圖上確認不同批次的細胞交織後，務必繪製已知的細胞專一性 Marker genes。如果校正後連經典的 Marker 都無法區分細胞群，則暗示發生了過度校正。</p>
+            </div>
+            </div>
+            </div>
+            </div>
+            </div>
+            </section>
+            </main>
+            
+            <footer class="bg-slate-950 text-slate-500 py-8 text-center border-t border-slate-800">
+            <div class="max-w-7xl mx-auto px-4">
+            <p class="mb-2">單細胞定序批次效應校正技術指南</p>
+            <p class="text-xs">內容由 AI 分析 Source Report 輔助生成，提供最佳實踐建議。僅供學術交流與分析參考。</p>
+            </div>
+            </footer>
+            
+            <script>
+            document.addEventListener('DOMContentLoaded', () => {
+              
+              const algoTabs = document.querySelectorAll('.algo-tab');
+              const algoContents = document.querySelectorAll('.algo-content');
+              
+              algoTabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                  algoTabs.forEach(t => {
+                    t.classList.remove('tab-active', 'bg-white', 'shadow-sm', 'border', 'border-slate-200');
+                    t.classList.add('hover:bg-white/50', 'text-slate-600');
+                    t.querySelector('.text-lg').classList.remove('text-blue-600');
+                  });
+                  
+                  tab.classList.add('tab-active', 'bg-white', 'shadow-sm', 'border', 'border-slate-200');
+                  tab.classList.remove('hover:bg-white/50', 'text-slate-600');
+                  tab.querySelector('.text-lg').classList.add('text-blue-600');
+                  
+                  const targetId = tab.getAttribute('data-target');
+                  algoContents.forEach(content => {
+                    content.classList.add('hidden');
+                  });
+                  document.getElementById('content-' + targetId).classList.remove('hidden');
+                });
+              });
+              
+              const ctx = document.getElementById('umapChart').getContext('2d');
+              
+              const generateCluster = (centerX, centerY, variance, count, batchId, cellType) => {
+                let data = [];
+                for (let i = 0; i < count; i++) {
+                  data.push({
+                    x: centerX + (Math.random() - 0.5) * variance + (Math.random() - 0.5) * variance,
+                    y: centerY + (Math.random() - 0.5) * variance + (Math.random() - 0.5) * variance,
+                    batch: batchId,
+                    type: cellType
+                  });
+                }
+                return data;
+              };
+              
+              const batch1_typeA_raw = generateCluster(20, 30, 15, 80, 'Batch 1', 'Type A');
+              const batch1_typeB_raw = generateCluster(30, 60, 15, 80, 'Batch 1', 'Type B');
+              const batch2_typeA_raw = generateCluster(70, 30, 15, 80, 'Batch 2', 'Type A');
+              const batch2_typeB_raw = generateCluster(80, 60, 15, 80, 'Batch 2', 'Type B');
+              
+              const batch1_typeA_cor = generateCluster(45, 30, 12, 80, 'Batch 1', 'Type A');
+              const batch1_typeB_cor = generateCluster(55, 60, 12, 80, 'Batch 1', 'Type B');
+              const batch2_typeA_cor = generateCluster(47, 28, 12, 80, 'Batch 2', 'Type A');
+              const batch2_typeB_cor = generateCluster(53, 62, 12, 80, 'Batch 2', 'Type B');
+              
+              const rawDataBatch1 = [...batch1_typeA_raw, ...batch1_typeB_raw];
+              const rawDataBatch2 = [...batch2_typeA_raw, ...batch2_typeB_raw];
+              
+              const corDataBatch1 = [...batch1_typeA_cor, ...batch1_typeB_cor];
+              const corDataBatch2 = [...batch2_typeA_cor, ...batch2_typeB_cor];
+              
+              let currentChart = new Chart(ctx, {
+                type: 'scatter',
+                data: {
+                  datasets: [
+                    {
+                      label: '批次 1 (Batch 1)',
+                      data: rawDataBatch1,
+                      backgroundColor: 'rgba(59, 130, 246, 0.6)',
+                      borderColor: 'rgb(37, 99, 235)',
+                      borderWidth: 1,
+                      pointRadius: 5,
+                      pointHoverRadius: 8,
+                      pointStyle: (context) => context.raw?.type === 'Type A' ? 'circle' : 'triangle'
+                    },
+                    {
+                      label: '批次 2 (Batch 2)',
+                      data: rawDataBatch2,
+                      backgroundColor: 'rgba(239, 68, 68, 0.6)',
+                      borderColor: 'rgb(220, 38, 38)',
+                      borderWidth: 1,
+                      pointRadius: 5,
+                      pointHoverRadius: 8,
+                      pointStyle: (context) => context.raw?.type === 'Type A' ? 'circle' : 'triangle'
+                    }
+                  ]
+                },
+                options: {
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  plugins: {
+                    legend: {
+                      position: 'top',
+                      labels: {
+                        usePointStyle: true,
+                        padding: 20,
+                        font: { size: 14 }
+                      }
+                    },
+                    tooltip: {
+                      callbacks: {
+                        label: (context) => {
+                          return `細胞群體: ${context.raw.type} | 來源: ${context.raw.batch}`;
+                        }
+                      }
+                    }
+                  },
+                  scales: {
+                    x: {
+                      display: false,
+                      min: 0,
+                      max: 100
+                    },
+                    y: {
+                      display: false,
+                      min: 0,
+                      max: 90
+                    }
+                  },
+                  animation: {
+                    duration: 1200,
+                    easing: 'easeOutQuart'
+                  }
+                }
+              });
+              
+              const btnRaw = document.getElementById('btn-raw');
+              const btnCorrected = document.getElementById('btn-corrected');
+              const statusText = document.getElementById('chart-status');
+              
+              btnRaw.addEventListener('click', () => {
+                currentChart.data.datasets[0].data = rawDataBatch1;
+                currentChart.data.datasets[1].data = rawDataBatch2;
+                currentChart.update();
+                
+                btnRaw.classList.replace('bg-slate-100', 'bg-slate-800');
+                btnRaw.classList.replace('text-slate-700', 'text-white');
+                btnRaw.classList.replace('hover:bg-slate-200', 'hover:bg-slate-700');
+                
+                btnCorrected.classList.replace('bg-blue-600', 'bg-blue-100');
+                btnCorrected.classList.replace('text-white', 'text-blue-700');
+                btnCorrected.classList.replace('hover:bg-blue-700', 'hover:bg-blue-200');
+                
+                statusText.textContent = "當前狀態：聚類異常 (按批次分離)";
+                statusText.className = "text-red-500 font-bold transition-colors duration-300";
+              });
+              
+              btnCorrected.addEventListener('click', () => {
+                currentChart.data.datasets[0].data = corDataBatch1;
+                currentChart.data.datasets[1].data = corDataBatch2;
+                currentChart.update();
+                
+                btnRaw.classList.replace('bg-slate-800', 'bg-slate-100');
+                btnRaw.classList.replace('text-white', 'text-slate-700');
+                btnRaw.classList.replace('hover:bg-slate-700', 'hover:bg-slate-200');
+                
+                btnCorrected.classList.replace('bg-blue-100', 'bg-blue-600');
+                btnCorrected.classList.replace('text-blue-700', 'text-white');
+                btnCorrected.classList.replace('hover:bg-blue-200', 'hover:bg-blue-700');
+                
+                statusText.textContent = "當前狀態：良好整合 (按細胞類型聚類，批次均勻混合)";
+                statusText.className = "text-emerald-600 font-bold transition-colors duration-300";
+              });
+            });
+          </script>
+            
+            </body>
+            </html>
