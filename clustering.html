@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+  <html lang="zh-TW">
+    <head>
+    <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>scRNA-seq 聚類分析互動指南</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+          <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+            <style>
+            @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;600;700&display=swap');
+          
+          body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background-color: #f8fafc;
+              color: #0f172a;
+          }
+          
+          .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 800px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 50vh;
+            max-height: 500px;
+            min-height: 300px;
+          }
+          
+          .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+          }
+          .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+          }
+          
+          .nav-item.active {
+            background-color: #eff6ff;
+              color: #2563eb;
+              border-right: 4px solid #2563eb;
+            font-weight: 600;
+          }
+          
+          .fade-in {
+            animation: fadeIn 0.4s ease-in-out;
+          }
+          
+          @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+          
+          .glass-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+          }
+          </style>
+            </head>
+            <body class="flex h-screen overflow-hidden">
+            
+            <!-- Chosen Palette: Slate (Neutrals), Blue (Primary/Active), Teal (Accent), Rose (Alerts/Pitfalls) -->
+            <!-- Application Structure Plan: A dashboard-style layout with a fixed sidebar for linear progression navigation (mimicking a bioinformatics pipeline). The main content area dynamically switches between 'modules' (Intro, Preprocessing, Algorithms, Interactive Resolution, Evaluation). This structure was chosen because scRNA-seq analysis is a sequential pipeline; guiding the user step-by-step while allowing free navigation is the most logical way to teach the methodology. The interactive UMAP simulator acts as the core "Wow" factor to visually explain the abstract concept of 'Resolution'. -->
+            <!-- Visualization & Content Choices: 
+            1. Intro: Text + Conceptual UI cards to explain goals (Inform). 
+          2. Preprocessing: Horizontal process flow UI (Organize/Process) using Tailwind grid. 
+          3. Algorithms: Side-by-side comparison cards (Compare) to contrast Graph-based and K-means. 
+          4. Resolution & Viz: Chart.js Scatter plot (Relationships/Change) acting as a UMAP simulator. A range slider dynamically regroups and recolors data points to demonstrate how 'Resolution' affects clustering outcomes. Justification: Visualizing the math makes abstract parameters concrete. Library: Chart.js Canvas. 
+          5. Pitfalls: Grid of flip-style/hover cards (Inform) to highlight common errors. 
+          CONFIRMING: NO SVG used. NO Mermaid JS used. Canvas used for the main data visualization. -->
+            <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+            
+            <aside class="w-64 bg-white border-r border-slate-200 flex flex-col h-full z-20 flex-shrink-0 hidden md:flex">
+            <div class="p-6 border-b border-slate-100">
+            <h1 class="text-xl font-bold text-slate-800 leading-tight">scRNA-seq<br><span class="text-blue-600">聚類分析指南</span></h1>
+            </div>
+            <nav class="flex-1 overflow-y-auto py-4" id="sidebar-nav">
+            <button data-target="section-intro" class="nav-item active w-full text-left px-6 py-3 text-sm text-slate-600 hover:bg-slate-50 transition-colors flex items-center">
+            <span class="w-6 h-6 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center mr-3 text-xs font-bold">1</span>
+            分析目的
+          </button>
+            <button data-target="section-preprocess" class="nav-item w-full text-left px-6 py-3 text-sm text-slate-600 hover:bg-slate-50 transition-colors flex items-center">
+            <span class="w-6 h-6 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center mr-3 text-xs font-bold">2</span>
+            預處理步驟
+          </button>
+            <button data-target="section-algorithms" class="nav-item w-full text-left px-6 py-3 text-sm text-slate-600 hover:bg-slate-50 transition-colors flex items-center">
+            <span class="w-6 h-6 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center mr-3 text-xs font-bold">3</span>
+            主流演算法
+          </button>
+            <button data-target="section-interactive" class="nav-item w-full text-left px-6 py-3 text-sm text-slate-600 hover:bg-slate-50 transition-colors flex items-center">
+            <span class="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center mr-3 text-xs font-bold shadow-sm">4</span>
+            參數與視覺化 (互動)
+          </button>
+            <button data-target="section-evaluation" class="nav-item w-full text-left px-6 py-3 text-sm text-slate-600 hover:bg-slate-50 transition-colors flex items-center">
+            <span class="w-6 h-6 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center mr-3 text-xs font-bold">5</span>
+            評估與常見陷阱
+          </button>
+            </nav>
+            <div class="p-4 border-t border-slate-200 text-xs text-slate-400 text-center">
+            基於專家分析報告構建
+          </div>
+            </aside>
+            
+            <div class="md:hidden bg-white border-b border-slate-200 p-4 flex justify-between items-center fixed top-0 w-full z-30">
+            <h1 class="text-lg font-bold text-slate-800">scRNA-seq 分析指南</h1>
+            <select id="mobile-nav" class="bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2">
+            <option value="section-intro">1. 分析目的</option>
+            <option value="section-preprocess">2. 預處理步驟</option>
+            <option value="section-algorithms">3. 主流演算法</option>
+            <option value="section-interactive">4. 參數與視覺化 (互動)</option>
+            <option value="section-evaluation">5. 評估與陷阱</option>
+            </select>
+            </div>
+            
+            <main class="flex-1 overflow-y-auto bg-slate-50 hide-scrollbar pt-16 md:pt-0" id="main-content">
+            <div class="max-w-5xl mx-auto p-6 md:p-10">
+            
+            <section id="section-intro" class="content-section fade-in block">
+            <header class="mb-8">
+            <span class="text-blue-600 font-semibold tracking-wider text-sm uppercase">Phase 1</span>
+            <h2 class="text-3xl md:text-4xl font-bold text-slate-800 mt-2">聚類分析的目的</h2>
+            <p class="text-slate-600 mt-4 text-lg leading-relaxed">在典型的 scRNA-seq 實驗中，我們會獲得成千上萬個細胞的高維基因表達數據。聚類（Clustering）是將具有相似轉錄組特徵的細胞歸類在一起的關鍵步驟。本區塊概述了為何我們需要進行這項分析。</p>
+            </header>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
+            <div class="glass-card rounded-2xl p-6 hover:-translate-y-1 transition-transform duration-300">
+            <div class="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center mb-4 text-2xl">🔍</div>
+            <h3 class="text-xl font-bold text-slate-800 mb-2">識別細胞異質性</h3>
+            <p class="text-slate-600 text-sm leading-relaxed">發現在看似單一的組織樣本中，實際存在哪些不同的、具備特異功能的細胞群體。</p>
+            </div>
+            <div class="glass-card rounded-2xl p-6 hover:-translate-y-1 transition-transform duration-300">
+            <div class="w-12 h-12 bg-teal-100 rounded-xl flex items-center justify-center mb-4 text-2xl">✨</div>
+            <h3 class="text-xl font-bold text-slate-800 mb-2">發現新細胞類型</h3>
+            <p class="text-slate-600 text-sm leading-relaxed">透過無監督學習，識別出傳統生物學實驗方法尚未定義或極為稀有的細胞子集。</p>
+            </div>
+            <div class="glass-card rounded-2xl p-6 hover:-translate-y-1 transition-transform duration-300">
+            <div class="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center mb-4 text-2xl">🏷️</div>
+            <h3 class="text-xl font-bold text-slate-800 mb-2">細胞類型鑑定</h3>
+            <p class="text-slate-600 text-sm leading-relaxed">分群後，結合已知的標誌基因（Marker Genes），為每個未知的群體貼上精確的生物學標籤。</p>
+            </div>
+            </div>
+            </section>
+            
+            <section id="section-preprocess" class="content-section fade-in hidden">
+            <header class="mb-10">
+            <span class="text-blue-600 font-semibold tracking-wider text-sm uppercase">Phase 2</span>
+            <h2 class="text-3xl md:text-4xl font-bold text-slate-800 mt-2">聚類前的關鍵預處理</h2>
+            <p class="text-slate-600 mt-4 text-lg leading-relaxed">聚類不能直接作用於原始表達矩陣。原始數據充滿了技術噪聲和維度冗餘。本區塊展示了數據進入聚類演算法前，必須經歷的三個標準化與降維步驟。</p>
+            </header>
+            
+            <div class="relative">
+            <div class="absolute left-8 top-0 h-full w-0.5 bg-blue-200 hidden md:block"></div>
+            <div class="space-y-8">
+            
+            <div class="relative flex flex-col md:flex-row items-start md:items-center">
+            <div class="hidden md:flex absolute left-8 w-6 h-6 bg-blue-500 rounded-full -translate-x-1/2 items-center justify-center ring-4 ring-white z-10 text-white text-xs font-bold">A</div>
+            <div class="md:ml-20 glass-card rounded-2xl p-6 w-full border-l-4 border-l-blue-500">
+            <h3 class="text-xl font-bold text-slate-800 mb-3 flex items-center">
+            <span class="md:hidden bg-blue-500 text-white w-6 h-6 rounded-full inline-flex items-center justify-center text-xs mr-2">A</span>
+            歸一化與轉換 (Normalization & Transformation)
+          </h3>
+            <p class="text-slate-600 mb-4">為消除細胞間測序深度（Sequencing Depth）的物理差異：</p>
+            <ul class="list-disc list-inside text-sm text-slate-700 space-y-2 bg-slate-50 p-4 rounded-lg">
+            <li><strong class="text-slate-800">庫容歸一化：</strong>將每個細胞的總表達量縮放到一個常數（例如 10,000）。</li>
+            <li><strong class="text-slate-800">對數轉換：</strong>使用 <code class="bg-white px-1 py-0.5 rounded border border-slate-200">log(x + 1)</code> 減少數據的偏態性，穩定方差。</li>
+            </ul>
+            </div>
+            </div>
+            
+            <div class="relative flex flex-col md:flex-row items-start md:items-center">
+            <div class="hidden md:flex absolute left-8 w-6 h-6 bg-teal-500 rounded-full -translate-x-1/2 items-center justify-center ring-4 ring-white z-10 text-white text-xs font-bold">B</div>
+            <div class="md:ml-20 glass-card rounded-2xl p-6 w-full border-l-4 border-l-teal-500">
+            <h3 class="text-xl font-bold text-slate-800 mb-3 flex items-center">
+            <span class="md:hidden bg-teal-500 text-white w-6 h-6 rounded-full inline-flex items-center justify-center text-xs mr-2">B</span>
+            高變異基因選擇 (Feature Selection)
+          </h3>
+            <p class="text-slate-600 mb-4">並非所有基因都對區分細胞類型有用（如管家基因）。</p>
+            <div class="bg-teal-50 p-4 rounded-lg text-sm text-slate-700">
+            我們通常透過統計算式選擇 <strong class="text-teal-700">2,000 到 3,000 個高變異基因 (HVGs)</strong>。這些基因在不同細胞間的表達差異最大，能去除噪聲並提供最多的分類信息。
+          </div>
+            </div>
+            </div>
+            
+            <div class="relative flex flex-col md:flex-row items-start md:items-center">
+            <div class="hidden md:flex absolute left-8 w-6 h-6 bg-indigo-500 rounded-full -translate-x-1/2 items-center justify-center ring-4 ring-white z-10 text-white text-xs font-bold">C</div>
+            <div class="md:ml-20 glass-card rounded-2xl p-6 w-full border-l-4 border-l-indigo-500">
+            <h3 class="text-xl font-bold text-slate-800 mb-3 flex items-center">
+            <span class="md:hidden bg-indigo-500 text-white w-6 h-6 rounded-full inline-flex items-center justify-center text-xs mr-2">C</span>
+            降維 (Dimensionality Reduction)
+          </h3>
+            <p class="text-slate-600 mb-4">解決高維數據帶來的「維度災難」。</p>
+            <div class="flex items-center bg-indigo-50 p-4 rounded-lg">
+            <div class="text-3xl mr-4">📉</div>
+            <p class="text-sm text-slate-700">利用 <strong class="text-indigo-700">PCA (主成分分析)</strong> 將數千個基因的維度投影到前 30-50 個最具代表性的主成分上。後續的聚類演算法通常是在這個 PCA 降維空間中運行的。</p>
+            </div>
+            </div>
+            </div>
+            
+            </div>
+            </div>
+            </section>
+            
+            <section id="section-algorithms" class="content-section fade-in hidden">
+            <header class="mb-10">
+            <span class="text-blue-600 font-semibold tracking-wider text-sm uppercase">Phase 3</span>
+            <h2 class="text-3xl md:text-4xl font-bold text-slate-800 mt-2">主流聚類演算法比較</h2>
+            <p class="text-slate-600 mt-4 text-lg leading-relaxed">在完成數據降維後，核心的數學分群工作即將展開。本區塊比較了目前 scRNA-seq 領域中最常討論的兩種聚類演算法邏輯。</p>
+            </header>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            
+            <div class="glass-card rounded-2xl overflow-hidden relative border-blue-200 shadow-md">
+            <div class="absolute top-0 right-0 bg-blue-500 text-white text-xs font-bold px-3 py-1 rounded-bl-lg">目前最常用 / 業界標準</div>
+            <div class="p-6 bg-blue-50 border-b border-blue-100">
+            <h3 class="text-2xl font-bold text-blue-900">基於圖論的聚類</h3>
+            <p class="text-blue-700 text-sm mt-1">Graph-based Clustering</p>
+            </div>
+            <div class="p-6">
+            <p class="text-slate-600 text-sm mb-6">這是 <code class="bg-slate-100 px-1 rounded">Seurat</code> (R) 和 <code class="bg-slate-100 px-1 rounded">Scanpy</code> (Python) 等主流軟體的默認核心方法。</p>
+            
+            <h4 class="font-bold text-slate-800 text-sm mb-3">運作三步驟：</h4>
+            <ol class="space-y-4">
+            <li class="flex">
+            <span class="bg-blue-100 text-blue-600 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold mr-3 flex-shrink-0">1</span>
+            <div>
+            <strong class="text-slate-800 text-sm">構建 KNN 圖</strong>
+            <p class="text-xs text-slate-500 mt-1">計算細胞在 PCA 空間中的距離，為每個細胞找到最近的 K 個鄰居，建立網絡。</p>
+            </div>
+            </li>
+            <li class="flex">
+            <span class="bg-blue-100 text-blue-600 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold mr-3 flex-shrink-0">2</span>
+            <div>
+            <strong class="text-slate-800 text-sm">計算邊的權重</strong>
+            <p class="text-xs text-slate-500 mt-1">使用 Shared Nearest Neighbor (SNN) 算法優化細胞間連接的權重。</p>
+            </div>
+            </li>
+            <li class="flex">
+            <span class="bg-blue-100 text-blue-600 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold mr-3 flex-shrink-0">3</span>
+            <div>
+            <strong class="text-slate-800 text-sm">社區發現 (Community Detection)</strong>
+            <p class="text-xs text-slate-500 mt-1">使用 <strong class="text-blue-600">Louvain</strong> (優化模塊度) 或 <strong class="text-blue-600">Leiden</strong> (產生更具連通性的群體) 演算法將網絡切割成群集。</p>
+            </div>
+            </li>
+            </ol>
+            </div>
+            </div>
+            
+            <div class="glass-card rounded-2xl overflow-hidden opacity-90 border-slate-200">
+            <div class="p-6 bg-slate-100 border-b border-slate-200">
+            <h3 class="text-2xl font-bold text-slate-700">K-means 聚類</h3>
+            <p class="text-slate-500 text-sm mt-1">K-means Clustering</p>
+            </div>
+            <div class="p-6">
+            <p class="text-slate-600 text-sm mb-6">傳統機器學習中非常經典的算法，但在單細胞分析中面臨挑戰。</p>
+            
+            <div class="space-y-4">
+            <div>
+            <h4 class="font-bold text-slate-800 text-sm mb-1 flex items-center"><span class="text-lg mr-2">⚙️</span> 原理</h4>
+            <p class="text-sm text-slate-600 bg-slate-50 p-3 rounded-lg">必須預先指定期望的聚類數量 $K$，算法通過不斷迭代移動質心（Centroids）來將細胞分群。</p>
+            </div>
+            
+            <div class="mt-6">
+            <h4 class="font-bold text-red-600 text-sm mb-2 flex items-center"><span class="text-lg mr-2">⚠️</span> 在 scRNA-seq 中較少使用的原因</h4>
+            <ul class="list-disc list-inside text-sm text-slate-600 space-y-2">
+            <li>生物學上，研究者通常<strong class="text-slate-800">無法預知</strong>確切的細胞群體數量 ($K$ 值)。</li>
+            <li>K-means 假設簇是凸形且大小相似的，<strong class="text-slate-800">難以處理形狀複雜、大小差異巨大</strong>的單細胞數據分佈。</li>
+            </ul>
+            </div>
+            </div>
+            </div>
+            </div>
+            
+            </div>
+            </section>
+            
+            <section id="section-interactive" class="content-section fade-in hidden">
+            <header class="mb-6">
+            <span class="text-blue-600 font-semibold tracking-wider text-sm uppercase">Phase 4 & 5</span>
+            <h2 class="text-3xl md:text-4xl font-bold text-slate-800 mt-2">參數調整與 UMAP 視覺化模擬</h2>
+            <p class="text-slate-600 mt-3 text-lg leading-relaxed">聚類完成後，我們使用 <strong>UMAP</strong> 或 t-SNE 將高維數據投射到 2D 平面上。而在基於圖論的聚類中，<strong class="text-blue-600 bg-blue-50 px-2 py-1 rounded">Resolution (分辨率)</strong> 是決定分群細緻度的核心參數。請拖動下方滑桿觀察其影響。</p>
+            </header>
+            
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-6">
+            <div class="flex flex-col md:flex-row items-center justify-between mb-6 gap-6">
+            <div class="w-full md:w-1/2">
+            <label for="resolution-slider" class="block text-sm font-bold text-slate-700 mb-2 flex justify-between">
+            <span>Resolution 滑桿</span>
+            <span id="res-value" class="text-blue-600 font-mono text-lg bg-blue-50 px-2 rounded">0.2</span>
+            </label>
+            <input type="range" id="resolution-slider" min="0.1" max="1.2" step="0.1" value="0.2" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600">
+            <div class="flex justify-between text-xs text-slate-400 mt-2 font-mono">
+            <span>0.1 (低)</span>
+            <span>0.6</span>
+            <span>1.2 (高)</span>
+            </div>
+            </div>
+            <div class="w-full md:w-1/2 bg-slate-50 p-4 rounded-xl border border-slate-100 h-full">
+            <h4 class="font-bold text-slate-800 text-sm mb-1" id="res-title">當前狀態：識別大類</h4>
+            <p class="text-sm text-slate-600 transition-all" id="res-desc">
+            <strong>低 Resolution：</strong> 產生的群體較少，細胞被歸類為廣泛的系譜。例如圖中將細胞區分為「T 細胞系」與「B 細胞系」兩大類。適合宏觀概覽。
+          </p>
+            </div>
+            </div>
+            
+            <div class="chart-container">
+            <canvas id="umapChart"></canvas>
+            </div>
+            <div class="text-center mt-4 text-xs text-slate-400">
+            * 這是使用 Chart.js 模擬的 2D UMAP 投射數據，展示 Resolution 參數如何改變聚類結果的著色。
+          <br> <strong>t-SNE</strong>：擅長展示局部結構，但可能壓縮不同群體間的距離。 <strong>UMAP</strong>：目前最流行，更好地保留全局結構。
+          </div>
+            </div>
+            </section>
+            
+            <section id="section-evaluation" class="content-section fade-in hidden pb-20">
+            <header class="mb-10">
+            <span class="text-blue-600 font-semibold tracking-wider text-sm uppercase">Phase 6 & 7</span>
+            <h2 class="text-3xl md:text-4xl font-bold text-slate-800 mt-2">評估鑑定與常見陷阱</h2>
+            <p class="text-slate-600 mt-4 text-lg leading-relaxed">聚類只是一個數學上的分群，最後且最重要的一步是賦予其生物學意義（註釋），同時避開數據分析中常見的技術陷阱。本區塊總結了註釋方法與需警戒的錯誤。</p>
+            </header>
+            
+            <div class="mb-10">
+            <h3 class="text-xl font-bold text-slate-800 mb-4 border-b pb-2">如何賦予 Cluster 生物學意義？</h3>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+            <div class="text-blue-600 font-bold mb-2 text-lg">1. 差異表達分析 (DEA)</div>
+            <p class="text-sm text-slate-600">比較目標 Cluster 與其他所有細胞，尋找表達量顯著升高的<strong>標誌基因 (Markers)</strong>。</p>
+            </div>
+            <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+            <div class="text-teal-600 font-bold mb-2 text-lg">2. 自動註釋工具</div>
+            <p class="text-sm text-slate-600">使用如 <code class="bg-slate-100 px-1 rounded">SingleR</code> 或 <code class="bg-slate-100 px-1 rounded">Azimuth</code> 等軟體，將您的聚類結果與高質量的參考數據集進行演算法對比。</p>
+            </div>
+            <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+            <div class="text-indigo-600 font-bold mb-2 text-lg">3. 專家手動鑑定</div>
+            <p class="text-sm text-slate-600">這是黃金標準。由領域專家根據已知文獻中的標誌基因列表，審查並確認演算法的分類結果。</p>
+            </div>
+            </div>
+            </div>
+            
+            <div>
+            <h3 class="text-xl font-bold text-slate-800 mb-4 border-b pb-2 text-red-600">聚類分析常見陷阱警戒區</h3>
+            <div class="space-y-4">
+            
+            <div class="group bg-white border border-red-100 hover:border-red-300 rounded-xl p-5 transition-colors cursor-default relative overflow-hidden">
+            <div class="absolute left-0 top-0 h-full w-1 bg-red-400"></div>
+            <div class="flex justify-between items-center">
+            <h4 class="font-bold text-slate-800 text-lg flex items-center">
+            <span class="text-xl mr-2">✂️</span> 過度聚類 (Over-clustering)
+          </h4>
+            </div>
+            <p class="mt-2 text-sm text-slate-600 bg-slate-50 p-3 rounded">
+            <strong>現象：</strong> 將同一個細胞類型錯誤地拆分成多個群體。<br>
+            <strong>原因：</strong> Resolution 設置過高，或者演算法將純粹的技術噪聲（如不同的實驗批次、測序深度微小差異）誤認為生物學異質性。
+          </p>
+            </div>
+            
+            <div class="group bg-white border border-red-100 hover:border-red-300 rounded-xl p-5 transition-colors cursor-default relative overflow-hidden">
+            <div class="absolute left-0 top-0 h-full w-1 bg-orange-400"></div>
+            <div class="flex justify-between items-center">
+            <h4 class="font-bold text-slate-800 text-lg flex items-center">
+            <span class="text-xl mr-2">🧪</span> 批次效應 (Batch Effects)
+          </h4>
+            </div>
+            <p class="mt-2 text-sm text-slate-600 bg-slate-50 p-3 rounded">
+            <strong>現象：</strong> 聚類結果反映了樣本的來源（如：醫院 A vs 醫院 B），而不是真實的細胞類型。<br>
+            <strong>解法：</strong> 如果不同實驗樣本混合分析，必須在聚類前使用專門的數據整合（Integration）演算法（如 Seurat Integration, Harmony）來消除批次差異。
+          </p>
+            </div>
+            
+            <div class="group bg-white border border-red-100 hover:border-red-300 rounded-xl p-5 transition-colors cursor-default relative overflow-hidden">
+            <div class="absolute left-0 top-0 h-full w-1 bg-pink-400"></div>
+            <div class="flex justify-between items-center">
+            <h4 class="font-bold text-slate-800 text-lg flex items-center">
+            <span class="text-xl mr-2">👯</span> 雙細胞 (Doublets)
+          </h4>
+            </div>
+            <p class="mt-2 text-sm text-slate-600 bg-slate-50 p-3 rounded">
+            <strong>現象：</strong> 在 UMAP 圖上形成處於兩個大群中間的「橋樑」小群，無法用單一細胞類型的 marker 解釋。<br>
+            <strong>原因：</strong> 實驗過程中，兩個不同的細胞被錯誤地包裹在同一個液滴中被捕捉。其表達譜混合了兩種細胞的特徵。需透過 DoubletFinder 等工具過濾。
+          </p>
+            </div>
+            
+            </div>
+            </div>
+            </section>
+            
+            </div>
+            </main>
+            
+            <script>
+            document.addEventListener('DOMContentLoaded', () => {
+              const navItems = document.querySelectorAll('.nav-item');
+              const mobileNav = document.getElementById('mobile-nav');
+              const sections = document.querySelectorAll('.content-section');
+              
+              function switchSection(targetId) {
+                sections.forEach(sec => {
+                  sec.classList.remove('block');
+                  sec.classList.add('hidden');
+                });
+                const targetSec = document.getElementById(targetId);
+                if(targetSec) {
+                  targetSec.classList.remove('hidden');
+                  targetSec.classList.add('block');
+                }
+                
+                navItems.forEach(item => item.classList.remove('active'));
+                navItems.forEach(item => {
+                  if(item.getAttribute('data-target') === targetId) {
+                    item.classList.add('active');
+                  }
+                });
+                
+                if(targetId === 'section-interactive' && !window.chartInitialized) {
+                  initInteractiveChart();
+                  window.chartInitialized = true;
+                }
+              }
+              
+              navItems.forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                  switchSection(e.currentTarget.getAttribute('data-target'));
+                });
+              });
+              
+              mobileNav.addEventListener('change', (e) => {
+                switchSection(e.target.value);
+              });
+              
+              let umapChart = null;
+              
+              function generateRandomNormal(mean, stdDev) {
+                let u = 0, v = 0;
+                while(u === 0) u = Math.random();
+                while(v === 0) v = Math.random();
+                let num = Math.sqrt( -2.0 * Math.log( u ) ) * Math.cos( 2.0 * Math.PI * v );
+                return num * stdDev + mean;
+              }
+              
+              function generateClusterData(n, meanX, meanY, stdDev) {
+                const data = [];
+                for(let i=0; i<n; i++) {
+                  data.push({
+                    x: generateRandomNormal(meanX, stdDev),
+                    y: generateRandomNormal(meanY, stdDev)
+                  });
+                }
+                return data;
+              }
+              
+              function initInteractiveChart() {
+                const ctx = document.getElementById('umapChart').getContext('2d');
+                
+                const rawData = {
+                  c1: generateClusterData(100, 2, 2, 0.8),
+                  c2: generateClusterData(80, 3, 4, 0.6),
+                  c3: generateClusterData(120, 8, 2, 0.9),
+                  c4: generateClusterData(90, 7, 5, 0.7),
+                  c5: generateClusterData(60, 9, 8, 0.5)
+                };
+                
+                const getChartData = (resolution) => {
+                  if (resolution < 0.5) {
+                    return {
+                      datasets: [
+                        {
+                          label: 'T 細胞系 (大類)',
+                          data: [...rawData.c1, ...rawData.c2],
+                          backgroundColor: 'rgba(59, 130, 246, 0.6)', 
+                          borderColor: 'rgba(59, 130, 246, 1)',
+                          pointRadius: 4
+                        },
+                        {
+                          label: 'B 細胞系 (大類)',
+                          data: [...rawData.c3, ...rawData.c4, ...rawData.c5],
+                          backgroundColor: 'rgba(234, 88, 12, 0.6)', 
+                          borderColor: 'rgba(234, 88, 12, 1)',
+                          pointRadius: 4
+                        }
+                      ]
+                    };
+                  } else if (resolution >= 0.5 && resolution < 0.9) {
+                    return {
+                      datasets: [
+                        { label: 'CD4+ T', data: rawData.c1, backgroundColor: '#3b82f6', pointRadius: 4 },
+                        { label: 'CD8+ T', data: rawData.c2, backgroundColor: '#60a5fa', pointRadius: 4 },
+                        { label: 'Memory B', data: rawData.c3, backgroundColor: '#ea580c', pointRadius: 4 },
+                        { label: 'Naive B', data: rawData.c4, backgroundColor: '#f97316', pointRadius: 4 },
+                        { label: 'Plasma Cell', data: rawData.c5, backgroundColor: '#fdba74', pointRadius: 4 }
+                      ]
+                    };
+                  } else {
+                    return {
+                      datasets: [
+                        { label: 'CD4+ T (Sub 1)', data: rawData.c1.slice(0, 50), backgroundColor: '#1d4ed8', pointRadius: 4 },
+                        { label: 'CD4+ T (Sub 2)', data: rawData.c1.slice(50), backgroundColor: '#3b82f6', pointRadius: 4 },
+                        { label: 'CD8+ T', data: rawData.c2, backgroundColor: '#93c5fd', pointRadius: 4 },
+                        { label: 'Memory B (Resting)', data: rawData.c3.slice(0, 60), backgroundColor: '#9a3412', pointRadius: 4 },
+                        { label: 'Memory B (Active)', data: rawData.c3.slice(60), backgroundColor: '#ea580c', pointRadius: 4 },
+                        { label: 'Naive B', data: rawData.c4, backgroundColor: '#fb923c', pointRadius: 4 },
+                        { label: 'Plasma Cell', data: rawData.c5, backgroundColor: '#fed7aa', pointRadius: 4 }
+                      ]
+                    };
+                  }
+                };
+                
+                umapChart = new Chart(ctx, {
+                  type: 'scatter',
+                  data: getChartData(0.2),
+                  options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: {
+                      duration: 800,
+                      easing: 'easeOutQuart'
+                    },
+                    plugins: {
+                      legend: {
+                        position: 'right',
+                        labels: {
+                          usePointStyle: true,
+                          font: { family: "'Noto Sans TC', sans-serif" }
+                        }
+                      },
+                      tooltip: {
+                        callbacks: {
+                          label: function(context) {
+                            return context.dataset.label;
+                          }
+                        }
+                      }
+                    },
+                    scales: {
+                      x: {
+                        title: { display: true, text: 'UMAP_1' },
+                        grid: { display: false },
+                        ticks: { display: false }
+                      },
+                      y: {
+                        title: { display: true, text: 'UMAP_2' },
+                        grid: { display: false },
+                        ticks: { display: false }
+                      }
+                    }
+                  }
+                });
+                
+                const slider = document.getElementById('resolution-slider');
+                const resValue = document.getElementById('res-value');
+                const resTitle = document.getElementById('res-title');
+                const resDesc = document.getElementById('res-desc');
+                
+                slider.addEventListener('input', (e) => {
+                  const val = parseFloat(e.target.value);
+                  resValue.textContent = val.toFixed(1);
+                  
+                  if (val < 0.5) {
+                    resTitle.textContent = "當前狀態：識別大類 (Low Res)";
+                    resTitle.className = "font-bold text-blue-800 text-sm mb-1";
+                    resDesc.innerHTML = "<strong>低 Resolution (約 0.1-0.4)：</strong> 演算法偏向合併相鄰群體，產生的群體較少。適合識別大類別（如 T 細胞 vs B 細胞）。";
+                  } else if (val >= 0.5 && val < 0.9) {
+                    resTitle.textContent = "當前狀態：識別亞型 (Medium Res)";
+                    resTitle.className = "font-bold text-teal-800 text-sm mb-1";
+                    resDesc.innerHTML = "<strong>中 Resolution (約 0.5-0.8)：</strong> 產生的群體增多，大類被進一步細分。適合識別細胞亞型（如 CD4+ T vs CD8+ T 細胞）。";
+                  } else {
+                    resTitle.textContent = "當前狀態：過度細分風險 (High Res)";
+                    resTitle.className = "font-bold text-orange-800 text-sm mb-1";
+                    resDesc.innerHTML = "<strong>高 Resolution (約 0.9-1.2)：</strong> 演算法極度敏感，會產生大量微小的群體。可能捕捉到極稀有狀態，但也極易導致<strong>過度聚類 (Over-clustering)</strong>，將同一細胞硬拆開。";
+                  }
+                  
+                  umapChart.data = getChartData(val);
+                  umapChart.update();
+                });
+              }
+            });
+          </script>
+            </body>
+            </html>
