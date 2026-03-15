@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+  <html lang="zh-TW">
+    <head>
+    <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>scRNA-seq 數據縮放 (Scaling) 詳解</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+          <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+            <!-- Chosen Palette: Warm Neutrals with Teal/Indigo accents (Slate-50 bg, Slate-800 text, Teal-600 primary, Indigo-500 secondary) -->
+            <!-- Application Structure Plan: The SPA is designed as an interactive educational dashboard. It starts with a high-level overview, moves into a dynamic visual simulation of the core problem/solution (Scaling Effect), provides a side-by-side conceptual comparison (Normalization vs Scaling), details the technical implementation (Math & Seurat code with toggles), and concludes with best practices. This structure transforms a static text guide into an exploratory learning journey, prioritizing comprehension of *why* scaling matters before *how* it's done. -->
+    <!-- Visualization & Content Choices: 
+         1. Concept Explanation -> Text & Layout -> Clean typography and grid layouts for readability.
+         2. Scaling Effect (The "Why") -> Interactive Scatter Plot (Chart.js) -> Users toggle between "Before" and "After" scaling to visually experience how high-variance genes dominate unscaled data, and how Z-score equalizes them. Justification: Visualizing variance is far more intuitive than reading about it.
+         3. Norm vs Scaling -> Interactive Comparison Cards -> Clickable tabs to switch contexts. Justification: Chunking information reduces cognitive load.
+         4. Seurat Code -> Interactive Code Blocks -> Tabbed interface for Basic vs Advanced usage.
+         5. ALL visual elements rely on Canvas or HTML/CSS. NO SVG/Mermaid used. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 800px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 40vh;
+            max-height: 450px;
+            min-height: 300px;
+        }
+        
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(226, 232, 240, 0.8);
+        }
+
+        .tab-active {
+            border-bottom: 2px solid #0d9488;
+            color: #0d9488;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans antialiased leading-relaxed tracking-wide">
+
+    <nav class="sticky top-0 z-50 glass-panel shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16 items-center">
+                <div class="flex-shrink-0 flex items-center font-bold text-xl text-teal-700">
+                    🔬 scRNA-seq 分析指南
+                </div>
+                <div class="hidden md:flex space-x-8 text-sm font-medium text-slate-600">
+                    <a href="#intro" class="hover:text-teal-600 transition-colors">簡介與目的</a>
+                    <a href="#simulation" class="hover:text-teal-600 transition-colors">互動模擬</a>
+                    <a href="#comparison" class="hover:text-teal-600 transition-colors">概念辨析</a>
+                    <a href="#implementation" class="hover:text-teal-600 transition-colors">數學與實作</a>
+                    <a href="#best-practices" class="hover:text-teal-600 transition-colors">最佳實踐</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-20">
+
+        <section id="intro" class="scroll-mt-24">
+            <div class="text-center max-w-3xl mx-auto mb-12">
+                <h1 class="text-4xl md:text-5xl font-extrabold text-slate-900 mb-6 tracking-tight">數據縮放 (Scaling) 詳解</h1>
+                <p class="text-lg text-slate-600">
+                    在單細胞轉錄組測序分析流程中，數據縮放是銜接預處理與下游統計建模（如 PCA、聚類）的關鍵橋樑。本章節將帶您深入了解其本質。
+                </p>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-8 mt-10">
+                <div class="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
+                    <div class="text-3xl mb-4">⚖️</div>
+                    <h2 class="text-2xl font-bold text-slate-800 mb-4">什麼是 Scaling？</h2>
+                    <p class="text-slate-600 mb-4">
+                        Scaling 是一種線性變換，目的在於調整每個基因在所有細胞中的表達值，使得不同基因之間的表達水平具有可比性。
+                    </p>
+                    <p class="text-slate-600 bg-amber-50 p-4 rounded-lg border-l-4 border-amber-400">
+                        <strong>核心問題：</strong> 即使完成歸一化，高表達基因的變異絕對值通常遠大於低表達基因。若不縮放，降維算法（如 PCA）將被少數高表達基因主導，忽略重要的中低表達基因。
+                    </p>
+                </div>
+
+                <div class="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
+                    <div class="text-3xl mb-4">🎯</div>
+                    <h2 class="text-2xl font-bold text-slate-800 mb-4">三大核心目的</h2>
+                    <ul class="space-y-4">
+                        <li class="flex items-start">
+                            <span class="flex-shrink-0 h-6 w-6 rounded-full bg-teal-100 text-teal-600 flex items-center justify-center font-bold text-sm mr-3 mt-0.5">1</span>
+                            <div>
+                                <h3 class="font-semibold text-slate-800">賦予基因相等的權重</h3>
+                                <p class="text-sm text-slate-600">確保每個基因在後續分析中貢獻相同權重，防止特徵被掩蓋。</p>
+                            </div>
+                        </li>
+                        <li class="flex items-start">
+                            <span class="flex-shrink-0 h-6 w-6 rounded-full bg-teal-100 text-teal-600 flex items-center justify-center font-bold text-sm mr-3 mt-0.5">2</span>
+                            <div>
+                                <h3 class="font-semibold text-slate-800">標準化數值範圍</h3>
+                                <p class="text-sm text-slate-600">將所有基因的表達量轉換到同一量綱（通常是以 0 為中心）。</p>
+                            </div>
+                        </li>
+                        <li class="flex items-start">
+                            <span class="flex-shrink-0 h-6 w-6 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-sm mr-3 mt-0.5">3</span>
+                            <div>
+                                <h3 class="font-semibold text-slate-800">消除技術噪聲 (可選)</h3>
+                                <p class="text-sm text-slate-600">透過「迴歸分析」，剔除線粒體含量、細胞週期等協變量影響。</p>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <section id="simulation" class="scroll-mt-24 bg-slate-100 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-16">
+            <div class="max-w-7xl mx-auto">
+                <div class="mb-8 md:text-center max-w-3xl mx-auto">
+                    <h2 class="text-3xl font-bold text-slate-900 mb-4">互動模擬：為什麼我們需要 Scaling？</h2>
+                    <p class="text-slate-600">
+                        本區塊展示了 Scaling 對於方差的影響。請想像有兩個基因：<strong>基因 A</strong> (高表達，變異極大) 與 <strong>基因 B</strong> (低表達，變異極小)。點擊按鈕觀察 Scaling 前後的數據分佈變化。
+                    </p>
+                </div>
+
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                    <div class="flex flex-col sm:flex-row justify-center items-center gap-4 mb-6">
+                        <button id="btn-unscaled" class="px-6 py-2 rounded-full bg-teal-600 text-white font-medium hover:bg-teal-700 transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500">
+                            未縮放 (Unscaled Data)
+                        </button>
+                        <button id="btn-scaled" class="px-6 py-2 rounded-full bg-slate-200 text-slate-700 font-medium hover:bg-slate-300 transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-400">
+                            已縮放 (Scaled: Z-score)
+                        </button>
+                    </div>
+
+                    <div class="chart-container">
+                        <canvas id="varianceChart"></canvas>
+                    </div>
+                    
+                    <div class="mt-6 p-4 bg-teal-50 rounded-lg border border-teal-100" id="simulation-desc">
+                        <p class="text-sm text-teal-800"><strong>目前視角：未縮放。</strong> 注意 X 軸（基因 A）的變異範圍 (0~1000) 遠大於 Y 軸（基因 B）的範圍 (0~20)。若此時進行 PCA，主成分將幾乎完全由基因 A 決定。</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="comparison" class="scroll-mt-24">
+            <h2 class="text-3xl font-bold text-slate-900 mb-8 text-center">概念辨析：Scaling vs. Normalization</h2>
+            <p class="text-center text-slate-600 mb-10 max-w-2xl mx-auto">初學者經常混淆歸一化與數據縮放。透過下方互動卡片，清楚掌握兩者在分析流程中的本質差異。</p>
+
+            <div class="grid md:grid-cols-2 gap-0 overflow-hidden rounded-2xl shadow-sm border border-slate-200 bg-white">
+                <div class="p-8 border-b md:border-b-0 md:border-r border-slate-200">
+                    <div class="flex items-center mb-6">
+                        <div class="w-12 h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xl font-bold mr-4">N</div>
+                        <h3 class="text-2xl font-bold text-slate-800">歸一化 (Normalization)</h3>
+                    </div>
+                    <ul class="space-y-4">
+                        <li class="bg-slate-50 p-3 rounded-lg"><span class="font-semibold text-slate-700 block mb-1">主要目標</span> 消除<span class="text-blue-600 font-medium">細胞間</span>的測序深度差異。</li>
+                        <li class="bg-slate-50 p-3 rounded-lg"><span class="font-semibold text-slate-700 block mb-1">處理對象</span> 以<span class="text-blue-600 font-medium">「細胞」</span>為單位進行調整。</li>
+                        <li class="bg-slate-50 p-3 rounded-lg"><span class="font-semibold text-slate-700 block mb-1">常用方法</span> Log-normalization (CPM, TP10K)。</li>
+                        <li class="bg-slate-50 p-3 rounded-lg"><span class="font-semibold text-slate-700 block mb-1">執行順序</span> <span class="font-medium">先進行</span>。</li>
+                    </ul>
+                </div>
+
+                <div class="p-8 relative overflow-hidden">
+                    <div class="absolute top-0 right-0 w-32 h-32 bg-teal-50 rounded-bl-full -z-10"></div>
+                    <div class="flex items-center mb-6">
+                        <div class="w-12 h-12 rounded-full bg-teal-100 text-teal-600 flex items-center justify-center text-xl font-bold mr-4">S</div>
+                        <h3 class="text-2xl font-bold text-slate-800">縮放 (Scaling)</h3>
+                    </div>
+                    <ul class="space-y-4">
+                        <li class="bg-slate-50 p-3 rounded-lg border-l-4 border-teal-500"><span class="font-semibold text-slate-700 block mb-1">主要目標</span> 消除<span class="text-teal-600 font-medium">基因間</span>的變異範圍差異。</li>
+                        <li class="bg-slate-50 p-3 rounded-lg border-l-4 border-teal-500"><span class="font-semibold text-slate-700 block mb-1">處理對象</span> 以<span class="text-teal-600 font-medium">「基因」</span>為單位進行調整。</li>
+                        <li class="bg-slate-50 p-3 rounded-lg border-l-4 border-teal-500"><span class="font-semibold text-slate-700 block mb-1">常用方法</span> Z-score 轉換。</li>
+                        <li class="bg-slate-50 p-3 rounded-lg border-l-4 border-teal-500"><span class="font-semibold text-slate-700 block mb-1">執行順序</span> <span class="font-medium">後進行</span>。</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <section id="implementation" class="scroll-mt-24">
+            <div class="grid lg:grid-cols-5 gap-10">
+                
+                <div class="lg:col-span-2">
+                    <h2 class="text-3xl font-bold text-slate-900 mb-6">數學原理：Z-score</h2>
+                    <p class="text-slate-600 mb-6">最常用的 Scaling 方法是標準化。對於每一個基因 <em>g</em>，我們對其在所有細胞中的表達量進行以下計算：</p>
+                    
+                    <div class="bg-slate-800 text-white p-6 rounded-xl mb-6 shadow-inner text-center">
+                        <div class="text-3xl font-mono tracking-widest mb-2">z = (x - μ) / σ</div>
+                    </div>
+
+                    <div class="space-y-3 text-sm text-slate-700">
+                        <div class="flex items-center p-2 hover:bg-slate-100 rounded transition-colors"><span class="font-bold text-lg w-8 text-teal-600">x</span> 該基因在某個細胞中的原始（或已歸一化）表達量。</div>
+                        <div class="flex items-center p-2 hover:bg-slate-100 rounded transition-colors"><span class="font-bold text-lg w-8 text-teal-600">μ</span> 該基因在所有細胞中的表達 <strong>平均值</strong>。</div>
+                        <div class="flex items-center p-2 hover:bg-slate-100 rounded transition-colors"><span class="font-bold text-lg w-8 text-teal-600">σ</span> 該基因在所有細胞中的表達 <strong>標準差</strong>。</div>
+                    </div>
+
+                    <div class="mt-8 p-4 bg-indigo-50 rounded-lg border border-indigo-100">
+                        <h4 class="font-bold text-indigo-800 mb-2">💡 轉換後的結果：</h4>
+                        <ul class="list-disc list-inside text-indigo-700 text-sm space-y-1">
+                            <li>每個基因的平均表達量變為 <strong>0</strong>。</li>
+                            <li>每個基因的方差（Variance）變為 <strong>1</strong>。</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="lg:col-span-3">
+                    <h2 class="text-3xl font-bold text-slate-900 mb-6">在 Seurat 中的實作</h2>
+                    <p class="text-slate-600 mb-6">在 R 語言最常用的工具包 `Seurat` 中，這一步驟透過 <code>ScaleData()</code> 函數完成。請點擊切換不同情境的語法。</p>
+
+                    <div class="bg-slate-900 rounded-xl overflow-hidden shadow-lg border border-slate-700">
+                        <div class="flex border-b border-slate-700 bg-slate-800">
+                            <button class="code-tab-btn px-4 py-3 text-sm font-medium text-teal-400 border-b-2 border-teal-400 focus:outline-none" data-target="code-basic">
+                                基礎用法
+                            </button>
+                            <button class="code-tab-btn px-4 py-3 text-sm font-medium text-slate-400 border-b-2 border-transparent hover:text-slate-200 focus:outline-none" data-target="code-advanced">
+                                進階用法 (迴歸噪聲)
+                            </button>
+                        </div>
+                        
+                        <div class="p-6 overflow-x-auto">
+                            <div id="code-basic" class="code-panel">
+<pre class="font-mono text-sm text-slate-300 leading-relaxed">
+<span class="text-slate-500"># 僅對高變異基因 (Highly Variable Genes) 進行縮放，</span>
+<span class="text-slate-500"># 以提高計算效率並減少噪聲干擾</span>
+pbmc &lt;- <span class="text-blue-400">ScaleData</span>(
+  object = pbmc, 
+  features = <span class="text-blue-400">VariableFeatures</span>(object = pbmc)
+)
+</pre>
+                            </div>
+                            
+                            <div id="code-advanced" class="code-panel hidden">
+<pre class="font-mono text-sm text-slate-300 leading-relaxed">
+<span class="text-slate-500"># 如果發現數據受到線粒體比例或測序深度的干擾，</span>
+<span class="text-slate-500"># 可以在此步驟將其剔除 (Regress out)</span>
+pbmc &lt;- <span class="text-blue-400">ScaleData</span>(
+  object = pbmc, 
+  vars.to.regress = <span class="text-amber-300">c</span>(<span class="text-green-400">"percent.mt"</span>, <span class="text-green-400">"nCount_RNA"</span>)
+)
+</pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="best-practices" class="scroll-mt-24 pb-20">
+            <h2 class="text-3xl font-bold text-slate-900 mb-8 text-center">注意事項與最佳實踐</h2>
+            
+            <div class="grid md:grid-cols-3 gap-6">
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 hover:-translate-y-1 transition-transform">
+                    <div class="text-2xl mb-3">⚡</div>
+                    <h3 class="text-lg font-bold text-slate-800 mb-2">僅對 HVGs 縮放？</h3>
+                    <p class="text-sm text-slate-600">通常建議只對「高變異基因」(HVGs) 進行縮放。這不僅能節省大量的運算時間和內存，還能過濾掉大部分僅含噪聲的低表達基因，使後續 PCA 的結果更具代表性。</p>
+                </div>
+                
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 hover:-translate-y-1 transition-transform">
+                    <div class="text-2xl mb-3">✂️</div>
+                    <h3 class="text-lg font-bold text-slate-800 mb-2">數值截斷 (Clipping)</h3>
+                    <p class="text-sm text-slate-600">為了防止極端的離群值（Outliers）對縮放結果產生過大影響，<code>ScaleData</code> 默認會將縮放後的 Z-score 限制在一個範圍內（例如 [-10, 10]）。這保護了數據分佈的穩定性。</p>
+                </div>
+
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 hover:-translate-y-1 transition-transform">
+                    <div class="text-2xl mb-3">📉</div>
+                    <h3 class="text-lg font-bold text-slate-800 mb-2">對下游分析的影響</h3>
+                    <p class="text-sm text-slate-600">不可跳過此步驟！如果跳過 Scaling，PCA 的前幾個主成分通常只會反映出 UMI 總數或極少數高表達基因的變動，導致聚類結果失去真實的生物學解釋力。</p>
+                </div>
+            </div>
+
+            <div class="mt-12 bg-teal-600 text-white p-8 rounded-2xl text-center shadow-lg">
+                <h3 class="text-2xl font-bold mb-4">總結：公平的起跑線</h3>
+                <p class="text-teal-50 max-w-3xl mx-auto text-lg">
+                    Scaling 是 scRNA-seq 分析中不可或缺的「公平化」步驟。它讓不同表達量級的基因站在同一條起跑線上，確保我們捕捉到的差異是基於基因表達模式的相對變化，而非單純的數量級優勢。
+                </p>
+            </div>
+        </section>
+
+    </main>
+
+    <script>
+        // --- 互動模擬圖表邏輯 (Chart.js) ---
+        document.addEventListener('DOMContentLoaded', function() {
+            const ctx = document.getElementById('varianceChart').getContext('2d');
+            
+            // 模擬生成正態分佈數據函數
+            function randomNormal(mean, stdDev) {
+                let u = 0, v = 0;
+                while(u === 0) u = Math.random(); 
+                while(v === 0) v = Math.random();
+                let num = Math.sqrt( -2.0 * Math.log( u ) ) * Math.cos( 2.0 * Math.PI * v );
+                num = num / 10.0 + 0.5; // Translate to 0 -> 1
+                if (num > 1 || num < 0) return randomNormal(mean, stdDev); // resample between 0 and 1
+                return (num - 0.5) * 10 * stdDev + mean;
+            }
+
+            // 產生未縮放數據 (Gene A variance high, Gene B variance low)
+            const unscaledData = Array.from({length: 100}, () => ({
+                x: randomNormal(500, 150), // Gene A (High Expressed)
+                y: randomNormal(10, 2)     // Gene B (Low Expressed)
+            }));
+
+            // 產生縮放後數據 (Z-score 模擬，兩者 variance 接近 1，mean 接近 0)
+            const scaledData = Array.from({length: 100}, () => ({
+                x: randomNormal(0, 1), 
+                y: randomNormal(0, 1)  
+            }));
+
+            const chartConfig = {
+                type: 'scatter',
+                data: {
+                    datasets: [{
+                        label: '單一細胞',
+                        data: unscaledData,
+                        backgroundColor: 'rgba(13, 148, 136, 0.6)', // Teal 600
+                        borderColor: 'rgba(13, 148, 136, 1)',
+                        pointRadius: 5,
+                        pointHoverRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: (context) => `基因 A: ${context.parsed.x.toFixed(2)}, 基因 B: ${context.parsed.y.toFixed(2)}`
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: { display: true, text: '基因 A 表達量 (X軸)' },
+                            min: 0, max: 1000
+                        },
+                        y: {
+                            title: { display: true, text: '基因 B 表達量 (Y軸)' },
+                            min: 0, max: 20
+                        }
+                    },
+                    animation: {
+                        duration: 800,
+                        easing: 'easeOutQuart'
+                    }
+                }
+            };
+
+            let scatterChart = new Chart(ctx, chartConfig);
+
+            // 按鈕事件綁定
+            const btnUnscaled = document.getElementById('btn-unscaled');
+            const btnScaled = document.getElementById('btn-scaled');
+            const descArea = document.getElementById('simulation-desc');
+
+            btnUnscaled.addEventListener('click', () => {
+                // Update styling
+                btnUnscaled.classList.replace('bg-slate-200', 'bg-teal-600');
+                btnUnscaled.classList.replace('text-slate-700', 'text-white');
+                btnScaled.classList.replace('bg-teal-600', 'bg-slate-200');
+                btnScaled.classList.replace('text-white', 'text-slate-700');
+
+                // Update Chart Data & Scales
+                scatterChart.data.datasets[0].data = unscaledData;
+                scatterChart.options.scales.x.min = 0;
+                scatterChart.options.scales.x.max = 1000;
+                scatterChart.options.scales.y.min = 0;
+                scatterChart.options.scales.y.max = 20;
+                scatterChart.options.scales.x.title.text = '基因 A 表達量 (原始)';
+                scatterChart.options.scales.y.title.text = '基因 B 表達量 (原始)';
+                scatterChart.update();
+
+                // Update Text
+                descArea.innerHTML = `<p class="text-sm text-teal-800"><strong>目前視角：未縮放。</strong> 注意 X 軸（基因 A）的變異範圍 (0~1000) 遠大於 Y 軸（基因 B）的範圍 (0~20)。若此時進行 PCA，主成分將幾乎完全由基因 A 決定。</p>`;
+                descArea.className = "mt-6 p-4 bg-teal-50 rounded-lg border border-teal-100 transition-colors";
+            });
+
+            btnScaled.addEventListener('click', () => {
+                // Update styling
+                btnScaled.classList.replace('bg-slate-200', 'bg-teal-600');
+                btnScaled.classList.replace('text-slate-700', 'text-white');
+                btnUnscaled.classList.replace('bg-teal-600', 'bg-slate-200');
+                btnUnscaled.classList.replace('text-white', 'text-slate-700');
+
+                // Update Chart Data & Scales
+                scatterChart.data.datasets[0].data = scaledData;
+                scatterChart.options.scales.x.min = -4;
+                scatterChart.options.scales.x.max = 4;
+                scatterChart.options.scales.y.min = -4;
+                scatterChart.options.scales.y.max = 4;
+                scatterChart.options.scales.x.title.text = '基因 A 表達量 (Z-score)';
+                scatterChart.options.scales.y.title.text = '基因 B 表達量 (Z-score)';
+                scatterChart.update();
+
+                // Update Text
+                descArea.innerHTML = `<p class="text-sm text-slate-800"><strong>目前視角：已縮放 (Z-score)。</strong> 現在基因 A 與基因 B 的數值範圍都被標準化到以 0 為中心，方差約為 1。兩者在後續分析中具有相等的權重。</p>`;
+                descArea.className = "mt-6 p-4 bg-slate-100 rounded-lg border border-slate-200 transition-colors";
+            });
+        });
+
+        // --- 程式碼區塊 Tab 切換邏輯 ---
+        document.querySelectorAll('.code-tab-btn').forEach(button => {
+            button.addEventListener('click', () => {
+                // Reset all buttons
+                document.querySelectorAll('.code-tab-btn').forEach(btn => {
+                    btn.classList.remove('text-teal-400', 'border-teal-400');
+                    btn.classList.add('text-slate-400', 'border-transparent');
+                });
+                
+                // Active clicked button
+                button.classList.remove('text-slate-400', 'border-transparent');
+                button.classList.add('text-teal-400', 'border-teal-400');
+
+                // Hide all panels
+                document.querySelectorAll('.code-panel').forEach(panel => {
+                    panel.classList.add('hidden');
+                });
+
+                // Show target panel
+                const targetId = button.getAttribute('data-target');
+                document.getElementById(targetId).classList.remove('hidden');
+            });
+        });
+    </script>
+</body>
+</html>
