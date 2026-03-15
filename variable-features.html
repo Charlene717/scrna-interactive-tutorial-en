@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+  <html lang="zh-TW" class="scroll-smooth">
+    <head>
+    <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>scRNA-seq 高變異基因識別 (Feature Selection) 指南</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+          <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+            <style>
+            .chart-container {
+              position: relative;
+              width: 100%;
+              max-width: 800px;
+              margin-left: auto;
+              margin-right: auto;
+              height: 50vh;
+              max-height: 450px;
+            }
+          @media (min-width: 768px) {
+            .chart-container {
+              height: 60vh;
+              max-height: 500px;
+            }
+          }
+          .tab-content { display: none; }
+          .tab-content.active { display: block; animation: fadeIn 0.3s ease-in-out; }
+          .tab-btn.active { border-bottom: 2px solid #0EA5E9; color: #0EA5E9; font-weight: 600; }
+            @keyframes fadeIn {
+              from { opacity: 0; transform: translateY(5px); }
+              to { opacity: 1; transform: translateY(0); }
+            }
+            .code-block { font-family: 'Courier New', Courier, monospace; }
+            </style>
+              </head>
+              <body class="bg-slate-50 text-slate-800 antialiased font-sans">
+              
+              <!-- Chosen Palette: Warm Neutrals with Sky Blue & Emerald Accents (Slate-50 bg, Slate-800 text, Sky-500 for primary actions/highlights, Emerald-500 for secondary success/code highlights) -->
+              
+              <!-- Application Structure Plan: 
+              The SPA uses a single-page scrolling format with a fixed navigation bar for ease of access. 
+            1. Hero Section: Introduces the core concept and purpose.
+            2. "Why Feature Selection" (Intro): Uses a 3-column grid of interactive cards to break down the theoretical reasons (dimensionality, noise, signals) into bite-sized pieces.
+            3. "The Challenge" (Visualizer): Features an interactive Chart.js scatter plot. This is the centerpiece, allowing users to progressively reveal the Mean-Variance relationship and how algorithms define "HVGs" (outliers from the trend).
+            4. "Algorithms" (Compare): Uses a tabbed interface to organize the three main methods (VST, Dispersion, Pearson) to prevent information overload.
+            5. "Implementation & Tips" (Practice): Combines a code-switcher (R vs Python) with a visually separated list of practical tips, providing actionable takeaways.
+            This structure guides the user from 'Why' -> 'What is the physical problem' -> 'How is it solved mathematically' -> 'How to code it', creating a logical learning journey. -->
+              
+              <!-- Visualization & Content Choices: 
+              1. Reason Cards -> Goal: Inform. Method: Styled div cards with hover effects and Unicode icons. Justification: Makes text-heavy concepts digestible. Library: Tailwind CSS.
+            2. Mean-Variance Plot -> Goal: Compare/Visualize Relationships. Method: Chart.js Scatter Plot. Interaction: Buttons to toggle data states (Raw -> Trend -> HVGs). Justification: The core concept relies on understanding statistical residuals; seeing the scatter plot dynamically change makes the "standardization" concept intuitive. Library: Chart.js (NO SVG/Mermaid used).
+            3. Algorithm Tabs -> Goal: Organize. Method: JS-driven tabbed interface. Interaction: Click to switch content. Justification: Allows comparison without endless scrolling.
+            4. Code Viewer -> Goal: Inform. Method: Styled pre/code blocks with JS toggles. Justification: R and Python users only need to see their relevant code. -->
+              
+              <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+              
+              <nav class="fixed top-0 left-0 w-full bg-white/90 backdrop-blur-md shadow-sm z-50">
+              <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div class="flex justify-between h-16 items-center">
+              <div class="flex-shrink-0 font-bold text-xl text-sky-600 tracking-tight">
+              scRNA-seq 分析指引
+            </div>
+              <div class="hidden md:flex space-x-8">
+              <a href="#intro" class="text-slate-600 hover:text-sky-500 transition-colors font-medium">為何需要？</a>
+              <a href="#challenge" class="text-slate-600 hover:text-sky-500 transition-colors font-medium">核心挑戰</a>
+              <a href="#algorithms" class="text-slate-600 hover:text-sky-500 transition-colors font-medium">主流算法</a>
+              <a href="#implementation" class="text-slate-600 hover:text-sky-500 transition-colors font-medium">代碼與實踐</a>
+              </div>
+              </div>
+              </div>
+              </nav>
+              
+              <header class="pt-32 pb-16 bg-gradient-to-br from-slate-100 to-sky-50">
+              <div class="max-w-4xl mx-auto px-4 sm:px-6 text-center">
+              <h1 class="text-4xl md:text-5xl font-extrabold text-slate-900 mb-6 leading-tight">
+              識別高變異基因 <br><span class="text-sky-500 text-3xl md:text-4xl">(Feature Selection)</span>
+              </h1>
+              <p class="text-lg text-slate-600 leading-relaxed max-w-2xl mx-auto">
+              在單細胞分析中，並非所有基因都具有「資訊量」。本指南將帶您深入了解如何透過特徵選擇，找出在不同細胞亞群間表現顯著差異的關鍵基因，為後續的降維與分群奠定完美基礎。
+            </p>
+              </div>
+              </header>
+              
+              <main class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-24">
+              
+              <section id="intro" class="scroll-mt-24">
+              <div class="mb-10 text-center">
+              <h2 class="text-3xl font-bold text-slate-800 mb-4">1. 為什麼需要特徵選擇？</h2>
+              <p class="text-slate-600 max-w-3xl mx-auto">
+              此區塊介紹特徵選擇在單細胞數據處理中的三大核心目的。透過剔除無效資訊，我們能聚焦於真正定義細胞多樣性的生物學信號。請將游標移至下方卡片以查看詳細說明。
+            </p>
+              </div>
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div class="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md hover:-translate-y-1 transition-all duration-300">
+              <div class="text-4xl mb-4 text-sky-500">&#11019;</div>
+              <h3 class="text-xl font-bold mb-3">克服維度災難</h3>
+              <p class="text-slate-600 text-sm leading-relaxed">
+              單細胞數據通常包含 20,000+ 個基因，但大部分基因在多數細胞中不表達或表達極低。篩選 2,000-3,000 個高變異基因能大幅降低維度，顯著提升計算效率並減少記憶體消耗。
+            </p>
+              </div>
+              <div class="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md hover:-translate-y-1 transition-all duration-300">
+              <div class="text-4xl mb-4 text-sky-500">&#9881;</div>
+              <h3 class="text-xl font-bold mb-3">過濾技術噪音</h3>
+              <p class="text-slate-600 text-sm leading-relaxed">
+              測序過程中存在大量隨機性。許多低表達基因的微小變異，主要來自技術噪音（如 Dropout 效應，即基因明明有表達卻沒被測到）。排除這些基因可避免演算法被雜訊誤導。
+            </p>
+              </div>
+              <div class="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md hover:-translate-y-1 transition-all duration-300">
+              <div class="text-4xl mb-4 text-sky-500">&#128269;</div>
+              <h3 class="text-xl font-bold mb-3">增強生物信號</h3>
+              <p class="text-slate-600 text-sm leading-relaxed">
+              管家基因（Housekeeping genes）在所有細胞中穩定高表達，它們雖然表達量大，但對方差貢獻低，無助於區分細胞亞型。特徵選擇能精準過濾這些「高表達但無差異」的干擾項。
+            </p>
+              </div>
+              </div>
+              </section>
+              
+              <section id="challenge" class="scroll-mt-24 bg-white p-8 rounded-3xl shadow-sm border border-slate-200">
+              <div class="mb-8">
+              <h2 class="text-3xl font-bold text-slate-800 mb-4">2. 核心挑戰：均值與變異的關係</h2>
+              <p class="text-slate-600">
+              本區塊透過互動式散佈圖，展示測序數據中最棘手的現象：**表達量越高的基因，其觀測到的方差通常也越大**。若僅挑選「方差最大」的基因，只會選出一堆管家基因。點擊下方按鈕，觀察算法如何透過「標準化」找出真正的異常變異基因。
+            </p>
+              </div>
+              
+              <div class="flex flex-wrap gap-4 mb-6 justify-center">
+              <button id="btn-raw" class="px-5 py-2 rounded-full bg-slate-100 text-slate-700 font-medium hover:bg-slate-200 transition-colors">1. 顯示原始分佈</button>
+              <button id="btn-trend" class="px-5 py-2 rounded-full bg-slate-100 text-slate-700 font-medium hover:bg-slate-200 transition-colors">2. 擬合預期趨勢線</button>
+              <button id="btn-hvg" class="px-5 py-2 rounded-full bg-sky-500 text-white font-medium hover:bg-sky-600 shadow-md shadow-sky-200 transition-colors">3. 識別高變異基因</button>
+              </div>
+              
+              <div class="chart-container bg-slate-50 rounded-xl p-4 border border-slate-100">
+              <canvas id="varianceChart"></canvas>
+              </div>
+              <div class="mt-4 text-center text-sm text-slate-500" id="chart-caption">
+              圖表說明：每個點代表一個基因。X軸為平均表達量，Y軸為方差（均為對數尺度模擬數據）。
+            </div>
+              </section>
+              
+              <section id="algorithms" class="scroll-mt-24">
+              <div class="mb-8 text-center">
+              <h2 class="text-3xl font-bold text-slate-800 mb-4">3. 主流算法解析</h2>
+              <p class="text-slate-600 max-w-3xl mx-auto">
+              了解數據特徵後，我們來看看目前主流的單細胞分析工具套件是如何在數學上處理這個挑戰的。此區塊整理了三種最廣泛被使用的特徵選擇算法機制。
+            </p>
+              </div>
+              
+              <div class="max-w-4xl mx-auto bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+              <div class="flex border-b border-slate-200 bg-slate-50">
+              <button class="tab-btn active flex-1 py-4 text-center font-medium text-slate-600 hover:bg-slate-100 transition-colors" data-target="tab-vst">VST (Seurat 預設)</button>
+              <button class="tab-btn flex-1 py-4 text-center font-medium text-slate-600 hover:bg-slate-100 transition-colors" data-target="tab-disp">分散度法 (Scanpy)</button>
+              <button class="tab-btn flex-1 py-4 text-center font-medium text-slate-600 hover:bg-slate-100 transition-colors" data-target="tab-pearson">皮爾森殘差</button>
+              </div>
+              <div class="p-8">
+              <div id="tab-vst" class="tab-content active">
+              <h3 class="text-2xl font-bold text-slate-800 mb-4">Variance Stabilizing Transformation (VST)</h3>
+              <p class="mb-4 text-slate-600">這是 R 語言套件 <strong>Seurat</strong> 目前的預設方法，核心思想是基於回歸模型來平滑均值與方差的關係。</p>
+              <ul class="space-y-3 text-slate-700 list-none">
+              <li class="flex items-start"><span class="text-sky-500 mr-2 font-bold">&#10003;</span> 1. 對所有基因計算 $log(mean)$ 和 $log(variance)$。</li>
+              <li class="flex items-start"><span class="text-sky-500 mr-2 font-bold">&#10003;</span> 2. 使用 <strong>Loess 回歸</strong> 擬合出一條趨勢線，這條線代表了在特定表達水平下的「預期技術變異」。</li>
+              <li class="flex items-start"><span class="text-sky-500 mr-2 font-bold">&#10003;</span> 3. 計算每個基因觀測到的變異與趨勢線之間的差異，即<strong>殘差（Residual）</strong>。</li>
+              <li class="flex items-start"><span class="text-sky-500 mr-2 font-bold">&#10003;</span> 4. 根據殘差數值進行排名，選取殘差最大的前 N 個基因（通常為 2000 個）。</li>
+              </ul>
+              </div>
+              <div id="tab-disp" class="tab-content">
+              <h3 class="text-2xl font-bold text-slate-800 mb-4">Dispersion-based (分散度法)</h3>
+              <p class="mb-4 text-slate-600">這是 Python 套件 <strong>Scanpy</strong> 以及早期 Seurat 使用的經典方法，透過分箱（Binning）技術來克服均值偏差。</p>
+              <ul class="space-y-3 text-slate-700 list-none">
+              <li class="flex items-start"><span class="text-emerald-500 mr-2 font-bold">&#10003;</span> 1. 計算每個基因的分散度（Dispersion = 方差 / 均值）。</li>
+              <li class="flex items-start"><span class="text-emerald-500 mr-2 font-bold">&#10003;</span> 2. 為了消除高表達基因分散度自然偏高的影響，將所有基因依據其均值劃分成不同的箱子（Bins）。</li>
+              <li class="flex items-start"><span class="text-emerald-500 mr-2 font-bold">&#10003;</span> 3. 在每個獨立的箱子內部，計算分散度的 <strong>Z-score</strong>（標準化分數）。</li>
+              <li class="flex items-start"><span class="text-emerald-500 mr-2 font-bold">&#10003;</span> 4. 這種分箱策略確保了無論在低、中、高表達區間，都能公平地選出相對變異程度較大的基因。</li>
+              </ul>
+              </div>
+              <div id="tab-pearson" class="tab-content">
+              <h3 class="text-2xl font-bold text-slate-800 mb-4">Pearson Residuals (皮爾森殘差)</h3>
+              <p class="mb-4 text-slate-600">通常與 <strong>SCTransform</strong> 流程結合使用，是目前處理測序深度偏差被認為最嚴謹的統計方法。</p>
+              <ul class="space-y-3 text-slate-700 list-none">
+              <li class="flex items-start"><span class="text-purple-500 mr-2 font-bold">&#10003;</span> 1. 建立一個正則化的負二項分布（Negative Binomial）模型。</li>
+              <li class="flex items-start"><span class="text-purple-500 mr-2 font-bold">&#10003;</span> 2. 使用該模型預測每個基因在每一個單一細胞中的「預期計數」（Expected Counts）。</li>
+              <li class="flex items-start"><span class="text-purple-500 mr-2 font-bold">&#10003;</span> 3. 計算實際觀測值與預期值之間的<strong>皮爾森殘差</strong>。</li>
+              <li class="flex items-start"><span class="text-purple-500 mr-2 font-bold">&#10003;</span> 4. 殘差的方差即代表了該基因排除了測序深度影響後的純粹生物學變異。選取殘差方差最大的基因作為 HVGs。</li>
+              </ul>
+              </div>
+              </div>
+              </div>
+              </section>
+              
+              <section id="implementation" class="scroll-mt-24 pb-20">
+              <div class="mb-8">
+              <h2 class="text-3xl font-bold text-slate-800 mb-4">4. 代碼實現與分析建議</h2>
+              <p class="text-slate-600">
+              此區塊提供實務操作的代碼範例以及分析過程中應注意的關鍵事項。您可以根據您使用的程式語言切換查看相應的代碼，並參照建議調整您的分析流程。
+            </p>
+              </div>
+              
+              <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <div class="bg-slate-900 rounded-2xl shadow-lg overflow-hidden flex flex-col">
+              <div class="flex justify-between items-center px-4 py-3 bg-slate-800 border-b border-slate-700">
+              <div class="flex space-x-2">
+              <button class="code-tab-btn px-3 py-1 text-sm rounded bg-sky-500/20 text-sky-400 font-medium" data-target="code-r">R (Seurat)</button>
+              <button class="code-tab-btn px-3 py-1 text-sm rounded text-slate-400 hover:text-slate-200 transition-colors" data-target="code-python">Python (Scanpy)</button>
+              </div>
+              <div class="flex space-x-1.5">
+              <div class="w-3 h-3 rounded-full bg-red-500"></div>
+              <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+              <div class="w-3 h-3 rounded-full bg-green-500"></div>
+              </div>
+              </div>
+              <div class="p-6 overflow-x-auto text-slate-300 text-sm code-block flex-grow">
+              <div id="code-r" class="code-content block">
+              <span class="text-slate-500"># 讀取數據並標準化後執行</span>
+              pbmc <- <span class="text-sky-300">FindVariableFeatures</span>(pbmc, 
+                                                                             selection.method = <span class="text-emerald-300">"vst"</span>, 
+                                                                             nfeatures = <span class="text-purple-300">2000</span>)
+            
+            <span class="text-slate-500"># 可視化變異基因散佈圖</span>
+              plot1 <- <span class="text-sky-300">VariableFeaturePlot</span>(pbmc)
+            
+            <span class="text-slate-500"># 標示出變異最大的前 10 個基因名稱</span>
+              <span class="text-sky-300">LabelPoints</span>(plot = plot1, 
+                                                            points = <span class="text-sky-300">head</span>(<span class="text-sky-300">VariableFeatures</span>(pbmc), <span class="text-purple-300">10</span>), 
+                                                            repel = <span class="text-emerald-300">TRUE</span>)
+            </div>
+              <div id="code-python" class="code-content hidden">
+              <span class="text-purple-400">import</span> scanpy <span class="text-purple-400">as</span> sc
+            
+            <span class="text-slate-500"># 假設 adata 是已經過濾與對數標準化的 AnnData 物件</span>
+              <span class="text-slate-500"># 執行特徵選擇 (預設為 dispersion 法，這裡指定 seurat flavor)</span>
+              sc.pp.highly_variable_genes(adata, 
+                                          n_top_genes=<span class="text-purple-300">2000</span>, 
+                                          flavor=<span class="text-emerald-300">'seurat'</span>)
+            
+            <span class="text-slate-500"># 生成均值-方差可視化圖表</span>
+              sc.pl.highly_variable_genes(adata)
+            </div>
+              </div>
+              </div>
+              
+              <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
+              <h3 class="text-xl font-bold text-slate-800 mb-6 flex items-center">
+              <span class="text-2xl mr-2">&#128161;</span> 實務分析建議
+              </h3>
+              <ul class="space-y-6">
+              <li>
+              <h4 class="font-bold text-slate-700 mb-1">1. 決定基因數量 (n_features)</h4>
+              <p class="text-sm text-slate-600">通常選擇 <strong>2,000</strong> 個基因是標準做法。但如果您的樣本細胞異質性極高（例如：全腦圖譜、發育中的多組織胚胎樣本），增加到 <strong>3,000-5,000</strong> 個往往會有更好的聚類解析度。</p>
+              </li>
+              <li>
+              <h4 class="font-bold text-slate-700 mb-1">2. 處理批次效應 (Batch Effects)</h4>
+              <p class="text-sm text-slate-600">若數據混雜了不同批次（如不同測序儀、不同天實驗），特徵選擇極易選出「批次特異性基因」。強烈建議在<strong>各個批次中分別尋找 HVGs</strong>，最後取交集（最嚴謹）或聯集（保留最多資訊）作為最終特徵集。</p>
+              </li>
+              <li>
+              <h4 class="font-bold text-slate-700 mb-1">3. 剔除干擾基因清單</h4>
+              <p class="text-sm text-slate-600">線粒體基因（mt-）或核糖體基因（RPS/RPL）常因細胞壓力或代謝狀態被識別為高變異。如果您的研究重點是細胞類型（如免疫分群）而非代謝狀態，務必在進行 PCA 降維前，<strong>將這些基因從 HVG 清單中剔除</strong>。</p>
+              </li>
+              </ul>
+              </div>
+              </div>
+              </section>
+              </main>
+              
+              <script>
+              document.querySelectorAll('.tab-btn').forEach(button => {
+                button.addEventListener('click', () => {
+                  document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+                  document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+                  
+                  button.classList.add('active');
+                  const targetId = button.getAttribute('data-target');
+                  document.getElementById(targetId).classList.add('active');
+                });
+              });
+            
+            document.querySelectorAll('.code-tab-btn').forEach(button => {
+              button.addEventListener('click', () => {
+                document.querySelectorAll('.code-tab-btn').forEach(btn => {
+                  btn.classList.remove('bg-sky-500/20', 'text-sky-400');
+                  btn.classList.add('text-slate-400');
+                });
+                button.classList.remove('text-slate-400');
+                button.classList.add('bg-sky-500/20', 'text-sky-400');
+                
+                document.querySelectorAll('.code-content').forEach(content => {
+                  content.classList.remove('block');
+                  content.classList.add('hidden');
+                });
+                const targetId = button.getAttribute('data-target');
+                document.getElementById(targetId).classList.remove('hidden');
+                document.getElementById(targetId).classList.add('block');
+              });
+            });
+            
+            const ctx = document.getElementById('varianceChart').getContext('2d');
+            
+            const generateData = () => {
+              const baseGenes = [];
+              const hvgGenes = [];
+              const trendData = [];
+              
+              for(let i = 0; i <= 5; i += 0.2) {
+                trendData.push({x: i, y: i * 0.8 + 0.5});
+              }
+              
+              for(let i = 0; i < 400; i++) {
+                let x = Math.random() * 4.5 + 0.1;
+                let expectedY = x * 0.8 + 0.5;
+                let noise = (Math.random() - 0.5) * 1.5;
+                let y = expectedY + noise;
+                if(y < 0.1) y = 0.1;
+                baseGenes.push({x: x, y: y});
+              }
+              
+              for(let i = 0; i < 60; i++) {
+                let x = Math.random() * 3 + 1;
+                let expectedY = x * 0.8 + 0.5;
+                let extraVariance = Math.random() * 2 + 1.5;
+                let y = expectedY + extraVariance;
+                hvgGenes.push({x: x, y: y});
+              }
+              return { baseGenes, hvgGenes, trendData };
+            };
+            
+            const chartData = generateData();
+            let currentState = 'raw'; 
+            
+            const varianceChart = new Chart(ctx, {
+              type: 'scatter',
+              data: {
+                datasets: [{
+                  label: '一般基因',
+                  data: chartData.baseGenes.concat(chartData.hvgGenes),
+                  backgroundColor: 'rgba(148, 163, 184, 0.6)', 
+                  borderColor: 'rgba(148, 163, 184, 0.8)',
+                  pointRadius: 4,
+                  pointHoverRadius: 6
+                }]
+              },
+              options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                  legend: {
+                    position: 'top',
+                    labels: { font: { family: "'Helvetica Neue', 'Helvetica', 'Arial', sans-serif" } }
+                  },
+                  tooltip: {
+                    callbacks: {
+                      label: function(context) {
+                        return `均值: ${context.parsed.x.toFixed(2)}, 方差: ${context.parsed.y.toFixed(2)}`;
+                      }
+                    }
+                  }
+                },
+                scales: {
+                  x: {
+                    title: { display: true, text: 'Log(平均表達量)', font: { weight: 'bold' } },
+                    grid: { color: '#f1f5f9' }
+                  },
+                  y: {
+                    title: { display: true, text: 'Log(變異 / 方差)', font: { weight: 'bold' } },
+                    grid: { color: '#f1f5f9' }
+                  }
+                },
+                animation: {
+                  duration: 800,
+                  easing: 'easeOutQuart'
+                }
+              }
+            });
+            
+            const updateChartInfo = (text) => {
+              document.getElementById('chart-caption').innerHTML = text;
+            };
+            
+            document.getElementById('btn-raw').addEventListener('click', () => {
+              varianceChart.data.datasets = [{
+                label: '所有觀測基因',
+                data: chartData.baseGenes.concat(chartData.hvgGenes),
+                backgroundColor: 'rgba(148, 163, 184, 0.6)',
+                borderColor: 'rgba(148, 163, 184, 0.8)',
+                pointRadius: 4,
+                order: 2
+              }];
+              varianceChart.update();
+              updateChartInfo('圖表說明：原始數據分佈。可以看到表達均值越高的基因，其方差往往也越大。如果直接選方差最大的，會選出右側的管家基因。');
+            });
+            
+            document.getElementById('btn-trend').addEventListener('click', () => {
+              varianceChart.data.datasets = [
+                {
+                  label: '基因分佈',
+                  data: chartData.baseGenes.concat(chartData.hvgGenes),
+                  backgroundColor: 'rgba(148, 163, 184, 0.6)',
+                  borderColor: 'rgba(148, 163, 184, 0.8)',
+                  pointRadius: 4,
+                  order: 2
+                },
+                {
+                  label: '預期變異趨勢線 (Loess)',
+                  data: chartData.trendData,
+                  type: 'line',
+                  borderColor: '#10B981', 
+                  borderWidth: 3,
+                  fill: false,
+                  pointRadius: 0,
+                  tension: 0.4,
+                  order: 1
+                }
+              ];
+              varianceChart.update();
+              updateChartInfo('圖表說明：綠線代表算法擬合出的「預期變異」。距離綠線越遠（上方），代表其變異程度超出預期。');
+            });
+            
+            document.getElementById('btn-hvg').addEventListener('click', () => {
+              varianceChart.data.datasets = [
+                {
+                  label: '低變異基因',
+                  data: chartData.baseGenes,
+                  backgroundColor: 'rgba(148, 163, 184, 0.3)',
+                  borderColor: 'transparent',
+                  pointRadius: 3,
+                  order: 3
+                },
+                {
+                  label: '預期變異趨勢線',
+                  data: chartData.trendData,
+                  type: 'line',
+                  borderColor: 'rgba(16, 185, 129, 0.5)',
+                  borderWidth: 2,
+                  borderDash: [5, 5],
+                  fill: false,
+                  pointRadius: 0,
+                  tension: 0.4,
+                  order: 2
+                },
+                {
+                  label: '高變異基因 (HVGs)',
+                  data: chartData.hvgGenes,
+                  backgroundColor: '#0EA5E9', 
+                  borderColor: '#0284C7',
+                  pointRadius: 5,
+                  pointHoverRadius: 7,
+                  order: 1
+                }
+              ];
+              varianceChart.update();
+              updateChartInfo('圖表說明：<span class="text-sky-600 font-bold">藍色點</span>即為透過計算殘差（與趨勢線的距離）所篩選出的高變異基因。這些才是我們降維分群所需的關鍵特徵！');
+            });
+            
+            document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+              anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                document.querySelector(this.getAttribute('href')).scrollIntoView({
+                  behavior: 'smooth'
+                });
+              });
+            });
+            </script>
+              </body>
+              </html>
