@@ -1,411 +1,445 @@
 <!DOCTYPE html>
-  <html lang="zh-TW">
-    <head>
+<html lang="en">
+  <head>
     <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>scRNA-seq中的PCA分析互動指南</title>
-        <script src="https://cdn.tailwindcss.com"></script>
-          <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-            <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
-              <style>
-              .chart-container { 
-                position: relative; 
-                width: 100%; 
-                max-width: 800px; 
-                margin-left: auto; 
-                margin-right: auto; 
-                height: 450px; 
-                max-height: 500px; 
-              }
-            @media (max-width: 768px) {
-              .chart-container { height: 350px; }
-            }
-            .fade-in { animation: fadeIn 0.5s ease-in-out; }
-            @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-            body { scroll-behavior: smooth; }
-            </style>
-              <!-- Chosen Palette: Warm Neutrals (Stone/Slate) with Ocean Blue and Teal Accents -->
-              <!-- Application Structure Plan: A single-page scrolling dashboard. The structure moves logically from "The Problem" (high dimensions), to "The Concept" (interactive 3D to 2D visualization), into the "Standard Pipeline" (interactive tabs), followed by "Parameter Selection" (interactive Elbow plot), and finally "Downstream & Limits" (cards). This flow builds understanding step-by-step. -->
-              <!-- Visualization & Content Choices: 
-              1. Problem -> HTML Cards with Unicode icons -> Interactive hover to reveal details -> Justification: Easy to read, cleanly separates the three main issues. Library: Tailwind/HTML.
-            2. Principle -> 3D Scatter Plot -> Interactive rotation and "Project to 2D" button -> Justification: PCA is a spatial transformation; 3D to 2D is the best human-comprehensible proxy for 20,000D to 50D. Library: Plotly.js.
-            3. Pipeline -> Horizontal/Vertical Interactive Tabs -> Click to show step details -> Justification: Avoids wall-of-text, forces user to process one step at a time. Library: Vanilla JS + Tailwind.
-            4. PC Selection -> Line Chart (Elbow Plot) -> Hover for variance -> Justification: The Elbow plot is the literal industry standard for this task. Library: Chart.js.
-            5. Downstream & Limits -> Grid layout text blocks -> Justification: Clear categorization of what comes next vs what PCA cannot do. Library: Tailwind/HTML.
-            Confirming NO SVG/Mermaid. -->
-              <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
-              </head>
-              <body class="bg-stone-50 text-stone-800 font-sans antialiased leading-relaxed">
-              
-              <nav class="sticky top-0 z-50 bg-white/90 backdrop-blur border-b border-stone-200 shadow-sm">
-              <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-              <div class="font-bold text-xl tracking-tight text-sky-800">scRNA-seq <span class="text-teal-600">PCA</span></div>
-              <div class="hidden md:flex space-x-8 text-sm font-medium text-stone-600">
-              <a href="#why" class="hover:text-sky-700 transition">為何需要 PCA？</a>
-              <a href="#principle" class="hover:text-sky-700 transition">核心原理</a>
-              <a href="#pipeline" class="hover:text-sky-700 transition">分析流程</a>
-              <a href="#elbow" class="hover:text-sky-700 transition">挑選 PCs</a>
-              <a href="#downstream" class="hover:text-sky-700 transition">後續與限制</a>
-              </div>
-              </div>
-              </nav>
-              
-              <header class="pt-24 pb-16 px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto text-center">
-              <div class="text-6xl mb-6">🧬 ➔ 📉</div>
-              <h1 class="text-4xl md:text-5xl font-extrabold tracking-tight text-stone-900 mb-6">單細胞 RNA 定序中的主成分分析 (PCA)</h1>
-              <p class="text-lg md:text-xl text-stone-600 mb-8 max-w-3xl mx-auto">
-              在處理擁有兩萬多個基因維度的單細胞數據時，PCA 是不可或缺的<strong class="text-sky-700">「資訊壓縮機」</strong>與<strong class="text-teal-600">「雜訊過濾器」</strong>。它幫助我們從混沌中提取真實的生物學訊號。
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Guide to PCA in scRNA-seq</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <style>
+      .chart-container { 
+        position: relative; 
+        width: 100%; 
+        max-width: 800px; 
+        margin-left: auto; 
+        margin-right: auto; 
+        height: 450px; 
+        max-height: 500px; 
+      }
+      @media (max-width: 768px) {
+        .chart-container { height: 350px; }
+      }
+      .fade-in { animation: fadeIn 0.5s ease-in-out; }
+      @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+      body { scroll-behavior: smooth; }
+    </style>
+
+    <!-- Chosen Palette: Warm Neutrals (Stone/Slate) with Ocean Blue and Teal Accents -->
+    <!-- Application Structure Plan: A single-page scrolling dashboard. The structure moves logically from "The Problem" (high dimensions), to "The Concept" (interactive 3D to 2D visualization), into the "Standard Pipeline" (interactive tabs), followed by "Parameter Selection" (interactive Elbow plot), and finally "Downstream & Limits" (cards). This flow builds understanding step-by-step. -->
+    <!-- Visualization & Content Choices:
+         1. Problem -> HTML Cards with Unicode icons -> Interactive hover to reveal details -> Justification: Easy to read, cleanly separates the three main issues. Library: Tailwind/HTML.
+         2. Principle -> 3D Scatter Plot -> Interactive rotation and "Project to 2D" button -> Justification: PCA is a spatial transformation; 3D to 2D is the best human-comprehensible proxy for 20,000D to 50D. Library: Plotly.js.
+         3. Pipeline -> Horizontal/Vertical Interactive Tabs -> Click to show step details -> Justification: Avoids wall-of-text, forces user to process one step at a time. Library: Vanilla JS + Tailwind.
+         4. PC Selection -> Line Chart (Elbow Plot) -> Hover for variance -> Justification: The Elbow plot is the standard tool for this purpose. Library: Chart.js.
+         5. Downstream & Limits -> Grid layout text blocks -> Justification: Clear categorization of what comes next vs what PCA cannot do. Library: Tailwind/HTML.
+         Confirming NO SVG/Mermaid. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+  </head>
+  <body class="bg-stone-50 text-stone-800 font-sans antialiased leading-relaxed">
+
+    <nav class="sticky top-0 z-50 bg-white/90 backdrop-blur border-b border-stone-200 shadow-sm">
+      <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+        <div class="font-bold text-xl tracking-tight text-sky-800">scRNA-seq <span class="text-teal-600">PCA</span></div>
+        <div class="hidden md:flex space-x-8 text-sm font-medium text-stone-600">
+          <a href="#why" class="hover:text-sky-700 transition">Why PCA?</a>
+          <a href="#principle" class="hover:text-sky-700 transition">Core Principle</a>
+          <a href="#pipeline" class="hover:text-sky-700 transition">Workflow</a>
+          <a href="#elbow" class="hover:text-sky-700 transition">Choosing PCs</a>
+          <a href="#downstream" class="hover:text-sky-700 transition">Downstream Use and Limitations</a>
+        </div>
+      </div>
+    </nav>
+
+    <header class="pt-24 pb-16 px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto text-center">
+      <div class="text-6xl mb-6">🧬 ➔ 📉</div>
+      <h1 class="text-4xl md:text-5xl font-extrabold tracking-tight text-stone-900 mb-6">
+        Principal Component Analysis (PCA) in Single-Cell RNA Sequencing
+      </h1>
+      <p class="text-lg md:text-xl text-stone-600 mb-8 max-w-3xl mx-auto">
+        When working with single-cell datasets containing more than 20,000 gene dimensions, PCA serves as both an essential <strong class="text-sky-700">information compressor</strong> and a <strong class="text-teal-600">noise filter</strong>. It helps us extract real biological structure from otherwise overwhelming complexity.
+      </p>
+    </header>
+
+    <main class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pb-24 space-y-32">
+
+      <section id="why" class="scroll-mt-24">
+        <div class="mb-12">
+          <h2 class="text-3xl font-bold text-stone-800 mb-4 border-b-4 border-sky-200 inline-block pb-2">1. Why Do We Need PCA in scRNA-seq?</h2>
+          <p class="text-stone-600 text-lg">
+            Human and mouse cells each contain expression information for more than 20,000 genes, creating an extremely high-dimensional data space. Direct analysis of these data presents three major challenges:
+          </p>
+        </div>
+
+        <div class="grid md:grid-cols-3 gap-6">
+          <div class="bg-white p-8 rounded-2xl shadow-md border border-stone-100 hover:-translate-y-1 hover:shadow-lg transition duration-300">
+            <div class="text-4xl mb-4">🌌</div>
+            <h3 class="text-xl font-bold text-sky-800 mb-3">Curse of Dimensionality</h3>
+            <p class="text-stone-600">
+              In very high-dimensional space, measuring distances or similarity between cells becomes increasingly difficult and often loses both mathematical stability and biological meaning.
             </p>
-              </header>
-              
-              <main class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pb-24 space-y-32">
-              
-              <section id="why" class="scroll-mt-24">
-              <div class="mb-12">
-              <h2 class="text-3xl font-bold text-stone-800 mb-4 border-b-4 border-sky-200 inline-block pb-2">1. 為什麼在 scRNA-seq 中需要 PCA？</h2>
-              <p class="text-stone-600 text-lg">人類或小鼠細胞具有超過 20,000 個基因，形成極度高維的數據空間。直接分析這些數據會面臨三大挑戰：</p>
-              </div>
-              
-              <div class="grid md:grid-cols-3 gap-6">
-              <div class="bg-white p-8 rounded-2xl shadow-md border border-stone-100 hover:-translate-y-1 hover:shadow-lg transition duration-300">
-              <div class="text-4xl mb-4">🌌</div>
-              <h3 class="text-xl font-bold text-sky-800 mb-3">維度災難 (Curse of Dimensionality)</h3>
-              <p class="text-stone-600">在高維度空間中，計算細胞與細胞之間的距離（相似度）會變得非常困難且失去數學與生物學意義。</p>
-              </div>
-              <div class="bg-white p-8 rounded-2xl shadow-md border border-stone-100 hover:-translate-y-1 hover:shadow-lg transition duration-300">
-              <div class="text-4xl mb-4">💻</div>
-              <h3 class="text-xl font-bold text-sky-800 mb-3">計算資源消耗</h3>
-              <p class="text-stone-600">直接對兩萬多個基因進行複雜的聚類或非線性降維 (如 UMAP)，需要極其龐大的記憶體和計算時間。</p>
-              </div>
-              <div class="bg-white p-8 rounded-2xl shadow-md border border-stone-100 hover:-translate-y-1 hover:shadow-lg transition duration-300">
-              <div class="text-4xl mb-4">🧹</div>
-              <h3 class="text-xl font-bold text-sky-800 mb-3">去除雜訊 (Noise Reduction)</h3>
-              <p class="text-stone-600">scRNA-seq 充滿技術雜訊。PCA 能提取代表「真實生物學訊號」的主要特徵，將隨機雜訊遺棄在後面的維度中。</p>
-              </div>
-              </div>
-              </section>
-              
-              <section id="principle" class="scroll-mt-24 bg-stone-100 p-8 md:p-12 rounded-3xl">
-              <div class="mb-8">
-              <h2 class="text-3xl font-bold text-stone-800 mb-4 border-b-4 border-teal-200 inline-block pb-2">2. PCA 的基本概念與原理</h2>
-              <p class="text-stone-600 text-lg">PCA 是一種<strong>線性降維</strong>數學方法。核心思想：尋找能夠<strong>最大化數據變異（Variance）</strong>的方向。透過 PCA，原本 20,000 維的數據，可濃縮到前 10~50 個主成分（PCs）中。</p>
-              </div>
-              
-              <div class="grid md:grid-cols-3 gap-8 items-center mb-8">
-              <div class="md:col-span-1 space-y-4">
-              <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-sky-500">
-              <h4 class="font-bold text-sky-900">PC1 (第一主成分)</h4>
-              <p class="text-sm text-stone-600">捕捉數據中<strong>最大</strong>的變異來源（例如：免疫與上皮細胞的根本差異）。</p>
-              </div>
-              <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-teal-500">
-              <h4 class="font-bold text-teal-900">PC2 (第二主成分)</h4>
-              <p class="text-sm text-stone-600">與 PC1 垂直（正交），捕捉剩餘數據中最大的變異。</p>
-              </div>
-              <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-stone-400">
-              <h4 class="font-bold text-stone-700">後續 PCs...</h4>
-              <p class="text-sm text-stone-600">捕捉變異量遞減，越後面的 PC 越可能只包含技術雜訊。</p>
-              </div>
-              </div>
-              <div class="md:col-span-2">
-              <div class="bg-white rounded-2xl p-4 shadow-inner">
+          </div>
+          <div class="bg-white p-8 rounded-2xl shadow-md border border-stone-100 hover:-translate-y-1 hover:shadow-lg transition duration-300">
+            <div class="text-4xl mb-4">💻</div>
+            <h3 class="text-xl font-bold text-sky-800 mb-3">Computational Burden</h3>
+            <p class="text-stone-600">
+              Running clustering or nonlinear dimensionality reduction directly on more than 20,000 genes requires substantial memory and computational time.
+            </p>
+          </div>
+          <div class="bg-white p-8 rounded-2xl shadow-md border border-stone-100 hover:-translate-y-1 hover:shadow-lg transition duration-300">
+            <div class="text-4xl mb-4">🧹</div>
+            <h3 class="text-xl font-bold text-sky-800 mb-3">Noise Reduction</h3>
+            <p class="text-stone-600">
+              scRNA-seq data contain extensive technical noise. PCA helps extract the main axes that reflect true biological signal, while pushing much of the random noise into later components.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section id="principle" class="scroll-mt-24 bg-stone-100 p-8 md:p-12 rounded-3xl">
+        <div class="mb-8">
+          <h2 class="text-3xl font-bold text-stone-800 mb-4 border-b-4 border-teal-200 inline-block pb-2">2. Core Concepts and Principles of PCA</h2>
+          <p class="text-stone-600 text-lg">
+            PCA is a <strong>linear dimensionality reduction</strong> method. Its core idea is to identify directions that <strong>maximize the variance</strong> in the data. Through PCA, an original 20,000-dimensional dataset can often be summarized into the first 10–50 principal components (PCs).
+          </p>
+        </div>
+
+        <div class="grid md:grid-cols-3 gap-8 items-center mb-8">
+          <div class="md:col-span-1 space-y-4">
+            <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-sky-500">
+              <h4 class="font-bold text-sky-900">PC1 (First Principal Component)</h4>
+              <p class="text-sm text-stone-600">
+                Captures the <strong>largest</strong> source of variation in the dataset, for example the broad difference between immune and epithelial cells.
+              </p>
+            </div>
+            <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-teal-500">
+              <h4 class="font-bold text-teal-900">PC2 (Second Principal Component)</h4>
+              <p class="text-sm text-stone-600">
+                Orthogonal to PC1 and captures the next-largest source of remaining variation.
+              </p>
+            </div>
+            <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-stone-400">
+              <h4 class="font-bold text-stone-700">Later PCs...</h4>
+              <p class="text-sm text-stone-600">
+                Capture progressively smaller amounts of variation, and later components are increasingly likely to reflect technical noise.
+              </p>
+            </div>
+          </div>
+
+          <div class="md:col-span-2">
+            <div class="bg-white rounded-2xl p-4 shadow-inner">
               <div class="flex justify-between items-center mb-2 px-4">
-              <span class="text-sm font-semibold text-stone-500">互動式概念演示：高維轉低維</span>
-              <button id="togglePcaBtn" class="bg-sky-600 hover:bg-sky-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition shadow">模擬執行 PCA 降維</button>
+                <span class="text-sm font-semibold text-stone-500">Interactive conceptual demo: from high-dimensional space to low-dimensional representation</span>
+                <button id="togglePcaBtn" class="bg-sky-600 hover:bg-sky-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition shadow">Simulate PCA Projection</button>
               </div>
               <div id="plotly-container" class="w-full h-[400px]"></div>
-              <p class="text-xs text-center text-stone-400 mt-2">提示：您可以用滑鼠旋轉或縮放上方的散佈圖。</p>
-              </div>
-              </div>
-              </div>
-              </section>
-              
-              <section id="pipeline" class="scroll-mt-24">
-              <div class="mb-12 text-center max-w-3xl mx-auto">
-              <h2 class="text-3xl font-bold text-stone-800 mb-4 border-b-4 border-sky-200 inline-block pb-2">3. PCA 在標準分析流程中的位置</h2>
-              <p class="text-stone-600 text-lg">在 Seurat 或 Scanpy 等軟體中，PCA 發生在資料前處理之後、細胞分群之前。點擊下方步驟查看詳情：</p>
-              </div>
-              
-              <div class="flex flex-col md:flex-row gap-6">
-              <div class="md:w-1/3 flex flex-col space-y-3" id="pipeline-buttons">
-              </div>
-              <div class="md:w-2/3 bg-white p-8 rounded-2xl shadow-lg border border-sky-100 flex items-center min-h-[250px]" id="pipeline-content">
-              </div>
-              </div>
-              </section>
-              
-              <section id="elbow" class="scroll-mt-24 bg-sky-50 p-8 md:p-12 rounded-3xl">
-              <div class="mb-10 text-center">
-              <h2 class="text-3xl font-bold text-stone-800 mb-4 border-b-4 border-teal-200 inline-block pb-2">4. 如何決定要使用多少個 PCs？</h2>
-              <p class="text-stone-600 text-lg max-w-3xl mx-auto">保留太少會遺失罕見亞群特徵；保留太多則引入雜訊。我們通常使用 <strong>碎石圖 (Elbow Plot)</strong> 或 <strong>JackStraw 分析</strong> 來做決定。</p>
-              </div>
-              
-              <div class="bg-white rounded-2xl p-6 shadow-md border border-stone-200">
-              <h3 class="text-xl font-bold text-center text-stone-700 mb-2">碎石圖 / 肘部法則 (Elbow Plot) 範例</h3>
-              <p class="text-sm text-center text-stone-500 mb-6">觀察曲線急劇下降後變得平緩的「轉折點」，即為建議保留的 PC 數量（通常落在 10-20 之間）。</p>
-              
-              <div class="chart-container">
-              <canvas id="elbowChart"></canvas>
-              </div>
-              </div>
-              </section>
-              
-              <section id="downstream" class="scroll-mt-24 mb-12">
-              <div class="mb-10">
-              <h2 class="text-3xl font-bold text-stone-800 mb-4 border-b-4 border-stone-300 inline-block pb-2">5. 後續應用 & 6. 限制</h2>
-              <p class="text-stone-600 text-lg">確定保留的 PCs（例如前 20 個）後，這 20 維的矩陣將成為所有高階分析的基礎。</p>
-              </div>
-              
-              <div class="grid md:grid-cols-2 gap-8">
-              <div class="space-y-6">
-              <h3 class="text-2xl font-bold text-sky-800 flex items-center">➔ PCA 的後續應用</h3>
-              
-              <div class="bg-white p-6 rounded-xl border-l-4 border-teal-500 shadow-sm">
-              <h4 class="font-bold text-lg mb-2">細胞聚類 (Clustering)</h4>
-              <p class="text-stone-600">如 Louvain 或 Leiden 演算法，會基於這幾十個 PCs 來構建 K-最近鄰圖 (KNN graph)，進而將細胞分群。</p>
-              </div>
-              
-              <div class="bg-white p-6 rounded-xl border-l-4 border-teal-500 shadow-sm">
-              <h4 class="font-bold text-lg mb-2">非線性降維與視覺化 (UMAP / t-SNE)</h4>
-              <p class="text-stone-600">UMAP/t-SNE 適合 2D 視覺化。計算起點<strong>不是</strong>原始矩陣，而是 PCA 降維後的結果。這能大幅加速運算並獲得更好視覺效果。</p>
-              </div>
-              
-              <div class="bg-white p-6 rounded-xl border-l-4 border-teal-500 shadow-sm">
-              <h4 class="font-bold text-lg mb-2">軌跡推斷 (Trajectory Inference)</h4>
-              <p class="text-stone-600">許多發育軌跡分析工具（如 Pseudotime）也是基於 PCA 空間來計算細胞狀態的轉換。</p>
-              </div>
-              </div>
-              
-              <div class="space-y-6">
-              <h3 class="text-2xl font-bold text-orange-700 flex items-center">⚠️ PCA 的先天限制</h3>
-              
-              <div class="bg-orange-50 p-8 rounded-xl border border-orange-200 h-full flex flex-col justify-center">
+              <p class="text-xs text-center text-stone-400 mt-2">Tip: You can rotate and zoom the scatter plot above with your mouse.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="pipeline" class="scroll-mt-24">
+        <div class="mb-12 text-center max-w-3xl mx-auto">
+          <h2 class="text-3xl font-bold text-stone-800 mb-4 border-b-4 border-sky-200 inline-block pb-2">3. Where PCA Fits in the Standard Analysis Workflow</h2>
+          <p class="text-stone-600 text-lg">
+            In toolkits such as Seurat or Scanpy, PCA is performed after preprocessing and before clustering. Click the steps below to view the details.
+          </p>
+        </div>
+
+        <div class="flex flex-col md:flex-row gap-6">
+          <div class="md:w-1/3 flex flex-col space-y-3" id="pipeline-buttons">
+          </div>
+          <div class="md:w-2/3 bg-white p-8 rounded-2xl shadow-lg border border-sky-100 flex items-center min-h-[250px]" id="pipeline-content">
+          </div>
+        </div>
+      </section>
+
+      <section id="elbow" class="scroll-mt-24 bg-sky-50 p-8 md:p-12 rounded-3xl">
+        <div class="mb-10 text-center">
+          <h2 class="text-3xl font-bold text-stone-800 mb-4 border-b-4 border-teal-200 inline-block pb-2">4. How Do We Decide How Many PCs to Use?</h2>
+          <p class="text-stone-600 text-lg max-w-3xl mx-auto">
+            Keeping too few PCs may lose biologically meaningful substructure, while keeping too many may introduce noise. In practice, we often use the <strong>Elbow Plot</strong> or <strong>JackStraw analysis</strong> to guide this choice.
+          </p>
+        </div>
+
+        <div class="bg-white rounded-2xl p-6 shadow-md border border-stone-200">
+          <h3 class="text-xl font-bold text-center text-stone-700 mb-2">Example Elbow Plot</h3>
+          <p class="text-sm text-center text-stone-500 mb-6">
+            Look for the turning point where the curve drops steeply and then begins to flatten. This is often used as a reasonable estimate for the number of PCs to retain, commonly somewhere between 10 and 20.
+          </p>
+
+          <div class="chart-container">
+            <canvas id="elbowChart"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <section id="downstream" class="scroll-mt-24 mb-12">
+        <div class="mb-10">
+          <h2 class="text-3xl font-bold text-stone-800 mb-4 border-b-4 border-stone-300 inline-block pb-2">5. Downstream Applications and 6. Limitations</h2>
+          <p class="text-stone-600 text-lg">
+            Once the retained PCs are chosen, for example the first 20, this lower-dimensional representation becomes the basis for most downstream analyses.
+          </p>
+        </div>
+
+        <div class="grid md:grid-cols-2 gap-8">
+          <div class="space-y-6">
+            <h3 class="text-2xl font-bold text-sky-800 flex items-center">➔ Downstream Applications of PCA</h3>
+
+            <div class="bg-white p-6 rounded-xl border-l-4 border-teal-500 shadow-sm">
+              <h4 class="font-bold text-lg mb-2">Cell Clustering</h4>
+              <p class="text-stone-600">
+                Algorithms such as Louvain or Leiden typically build a k-nearest neighbor graph using the selected PCs and then group cells based on that structure.
+              </p>
+            </div>
+
+            <div class="bg-white p-6 rounded-xl border-l-4 border-teal-500 shadow-sm">
+              <h4 class="font-bold text-lg mb-2">Nonlinear Dimensionality Reduction and Visualization (UMAP / t-SNE)</h4>
+              <p class="text-stone-600">
+                UMAP and t-SNE are mainly used for two-dimensional visualization. Their input is usually <strong>not</strong> the original expression matrix, but rather the PCA-reduced representation. This both accelerates computation and improves visualization quality.
+              </p>
+            </div>
+
+            <div class="bg-white p-6 rounded-xl border-l-4 border-teal-500 shadow-sm">
+              <h4 class="font-bold text-lg mb-2">Trajectory Inference</h4>
+              <p class="text-stone-600">
+                Many developmental trajectory tools, such as pseudotime methods, also rely on PCA space to estimate relationships between cellular states.
+              </p>
+            </div>
+          </div>
+
+          <div class="space-y-6">
+            <h3 class="text-2xl font-bold text-orange-700 flex items-center">⚠️ Inherent Limitations of PCA</h3>
+
+            <div class="bg-orange-50 p-8 rounded-xl border border-orange-200 h-full flex flex-col justify-center">
               <div class="text-4xl text-center mb-4 text-orange-400">📈 ➔ 🧬</div>
-              <h4 class="font-bold text-xl mb-4 text-orange-900 text-center">線性假設的侷限</h4>
+              <h4 class="font-bold text-xl mb-4 text-orange-900 text-center">Limitations of the Linear Assumption</h4>
               <p class="text-orange-800 leading-relaxed text-lg">
-              PCA 只能捕捉變數之間的<strong>線性關係</strong>。然而，生物系統（如基因調控網路）往往是高度非線性的。
-            </p>
+                PCA can only capture <strong>linear relationships</strong> between variables. However, biological systems, including gene regulatory networks and differentiation trajectories, are often highly nonlinear.
+              </p>
               <p class="text-orange-800 leading-relaxed text-lg mt-4">
-              這就是為什麼我們不用 PCA 來做最終的 2D 視覺化（它無法很好地展開複雜的細胞分化流形空間），而是仰賴後續的 UMAP 或 t-SNE 進行非線性映射。
-            </p>
-              </div>
-              </div>
-              </div>
-              </section>
-              
-              </main>
-              
-              <footer class="bg-stone-900 text-stone-400 py-8 text-center">
-              <p>互動式 scRNA-seq 分析教學文件 • 基於標準資料科學與生物資訊學流程</p>
-              </footer>
-              
-              <script>
-              document.addEventListener('DOMContentLoaded', () => {
-                
-                const pipelineSteps = [
-                  {
-                    id: 'qc',
-                    title: '1. 品質控制與標準化',
-                    icon: '🔬',
-                    desc: '<strong>(QC & Normalization)</strong><br><br>過濾掉死細胞或品質不佳的細胞（如粒線體基因比例過高），並標準化數據以消除不同細胞測序深度的影響。'
-                  },
-                  {
-                    id: 'hvg',
-                    title: '2. 尋找高變異基因',
-                    icon: '🎯',
-                    desc: '<strong>(Find Highly Variable Genes, HVGs)</strong><br><br>我們通常不會用全部兩萬個基因跑 PCA，而是挑選出在細胞群體間表現量差異最大的 2,000~3,000 個基因（HVGs）。這些基因包含了主要訊號。'
-                  },
-                  {
-                    id: 'scale',
-                    title: '3. 數據縮放',
-                    icon: '⚖️',
-                    desc: '<strong>(Scaling)</strong><br><br>將基因表現量標準化（通常是轉換為 Z-score），讓每個基因在矩陣中的權重平等。這可以避免高表現量的管家基因 (Housekeeping genes) 主導了 PCA 的結果。'
-                  },
-                  {
-                    id: 'pca',
-                    title: '4. 👉 執行 PCA',
-                    icon: '📉',
-                    desc: '<strong>(Run PCA)</strong><br><br>對這 2,000 個高變異基因的縮放矩陣執行線性代數運算（奇異值分解 SVD 或特徵值分解），正式計算出主成分 (PCs)。'
+                This is why PCA is typically not used as the final two-dimensional visualization tool. It cannot unfold complex nonlinear manifolds well, which is why methods such as UMAP or t-SNE are used afterward for nonlinear embedding.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <footer class="bg-stone-900 text-stone-400 py-8 text-center">
+      <p>Interactive scRNA-seq teaching resource • Based on standard data science and bioinformatics workflows</p>
+    </footer>
+
+    <script>
+      document.addEventListener('DOMContentLoaded', () => {
+
+        const pipelineSteps = [
+          {
+            id: 'qc',
+            title: '1. Quality Control and Normalization',
+            icon: '🔬',
+            desc: '<strong>(QC & Normalization)</strong><br><br>Filter out dead or poor-quality cells, such as those with excessively high mitochondrial gene content, and normalize the data to reduce differences in sequencing depth across cells.'
+          },
+          {
+            id: 'hvg',
+            title: '2. Identify Highly Variable Genes',
+            icon: '🎯',
+            desc: '<strong>(Find Highly Variable Genes, HVGs)</strong><br><br>We usually do not run PCA on all 20,000 genes. Instead, we select the 2,000–3,000 genes that show the strongest variation across cells. These genes contain most of the informative signal.'
+          },
+          {
+            id: 'scale',
+            title: '3. Data Scaling',
+            icon: '⚖️',
+            desc: '<strong>(Scaling)</strong><br><br>Standardize gene expression values, usually by transforming them into Z-scores, so that all genes contribute on a comparable scale. This helps prevent highly expressed housekeeping genes from dominating the PCA result.'
+          },
+          {
+            id: 'pca',
+            title: '4. 👉 Run PCA',
+            icon: '📉',
+            desc: '<strong>(Run PCA)</strong><br><br>Perform the core linear algebra step, such as singular value decomposition (SVD) or eigendecomposition, on the scaled matrix of highly variable genes to compute the principal components.'
+          }
+        ];
+
+        const pipelineBtnContainer = document.getElementById('pipeline-buttons');
+        const pipelineContent = document.getElementById('pipeline-content');
+
+        function renderPipelineContent(index) {
+          const step = pipelineSteps[index];
+
+          Array.from(pipelineBtnContainer.children).forEach((btn, i) => {
+            if (i === index) {
+              btn.className = 'text-left px-6 py-4 rounded-xl font-bold bg-sky-600 text-white shadow-md transition-all duration-200 transform scale-105';
+            } else {
+              btn.className = 'text-left px-6 py-4 rounded-xl font-medium bg-stone-100 text-stone-600 hover:bg-stone-200 transition-all duration-200';
+            }
+          });
+
+          pipelineContent.innerHTML = `
+            <div class="fade-in w-full">
+              <div class="text-5xl mb-6 text-sky-700">${step.icon}</div>
+              <h3 class="text-2xl font-bold text-stone-800 mb-4">${step.title}</h3>
+              <p class="text-lg text-stone-600 leading-relaxed">${step.desc}</p>
+            </div>
+          `;
+        }
+
+        pipelineSteps.forEach((step, index) => {
+          const btn = document.createElement('button');
+          btn.innerHTML = step.title;
+          btn.onclick = () => renderPipelineContent(index);
+          pipelineBtnContainer.appendChild(btn);
+        });
+
+        renderPipelineContent(0);
+
+        const elbowCtx = document.getElementById('elbowChart').getContext('2d');
+        const varianceData = [22.5, 14.2, 9.5, 6.8, 4.2, 3.5, 2.8, 2.1, 1.8, 1.5, 1.3, 1.1, 1.0, 0.9, 0.8, 0.7, 0.65, 0.6, 0.55, 0.5];
+        const labels = Array.from({length: 20}, (_, i) => `PC${i + 1}`);
+
+        new Chart(elbowCtx, {
+          type: 'line',
+          data: {
+            labels: labels,
+            datasets: [{
+              label: 'Explained Variance (%)',
+              data: varianceData,
+              borderColor: '#0284c7',
+              backgroundColor: 'rgba(2, 132, 199, 0.1)',
+              pointBackgroundColor: '#0f766e',
+              pointBorderColor: '#fff',
+              pointHoverBackgroundColor: '#fff',
+              pointHoverBorderColor: '#0f766e',
+              borderWidth: 3,
+              pointRadius: 5,
+              pointHoverRadius: 8,
+              fill: true,
+              tension: 0.3
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                backgroundColor: 'rgba(28, 25, 23, 0.9)',
+                titleFont: { size: 14 },
+                bodyFont: { size: 14 },
+                padding: 12,
+                displayColors: false,
+                callbacks: {
+                  label: function(context) {
+                    return `Explained variance: ${context.parsed.y}%`;
                   }
-                ];
-                
-                const pipelineBtnContainer = document.getElementById('pipeline-buttons');
-                const pipelineContent = document.getElementById('pipeline-content');
-                
-                function renderPipelineContent(index) {
-                  const step = pipelineSteps[index];
-                  
-                  Array.from(pipelineBtnContainer.children).forEach((btn, i) => {
-                    if (i === index) {
-                      btn.className = 'text-left px-6 py-4 rounded-xl font-bold bg-sky-600 text-white shadow-md transition-all duration-200 transform scale-105';
-                    } else {
-                      btn.className = 'text-left px-6 py-4 rounded-xl font-medium bg-stone-100 text-stone-600 hover:bg-stone-200 transition-all duration-200';
-                    }
-                  });
-                  
-                  pipelineContent.innerHTML = `
-                  <div class="fade-in w-full">
-                    <div class="text-5xl mb-6 text-sky-700">${step.icon}</div>
-                      <h3 class="text-2xl font-bold text-stone-800 mb-4">${step.title}</h3>
-                        <p class="text-lg text-stone-600 leading-relaxed">${step.desc}</p>
-                          </div>
-                          `;
                 }
-                
-                pipelineSteps.forEach((step, index) => {
-                  const btn = document.createElement('button');
-                  btn.innerHTML = step.title;
-                  btn.onclick = () => renderPipelineContent(index);
-                  pipelineBtnContainer.appendChild(btn);
-                });
-                
-                renderPipelineContent(0);
-                
-                const elbowCtx = document.getElementById('elbowChart').getContext('2d');
-                const varianceData = [22.5, 14.2, 9.5, 6.8, 4.2, 3.5, 2.8, 2.1, 1.8, 1.5, 1.3, 1.1, 1.0, 0.9, 0.8, 0.7, 0.65, 0.6, 0.55, 0.5];
-                const labels = Array.from({length: 20}, (_, i) => `PC${i + 1}`);
-                
-                new Chart(elbowCtx, {
-                  type: 'line',
-                  data: {
-                    labels: labels,
-                    datasets: [{
-                      label: '解釋變異比例 (%)',
-                      data: varianceData,
-                      borderColor: '#0284c7', 
-                      backgroundColor: 'rgba(2, 132, 199, 0.1)',
-                      pointBackgroundColor: '#0f766e', 
-                      pointBorderColor: '#fff',
-                      pointHoverBackgroundColor: '#fff',
-                      pointHoverBorderColor: '#0f766e',
-                      borderWidth: 3,
-                      pointRadius: 5,
-                      pointHoverRadius: 8,
-                      fill: true,
-                      tension: 0.3
-                    }]
-                  },
-                  options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                      legend: { display: false },
-                      tooltip: {
-                        backgroundColor: 'rgba(28, 25, 23, 0.9)',
-                        titleFont: { size: 14 },
-                        bodyFont: { size: 14 },
-                        padding: 12,
-                        displayColors: false,
-                        callbacks: {
-                          label: function(context) {
-                            return `變異比例: ${context.parsed.y}%`;
-                          }
-                        }
-                      },
-                      annotation: {
-                        annotations: {
-                          elbowPoint: {
-                            type: 'point',
-                            xValue: 'PC8',
-                            yValue: 2.1,
-                            backgroundColor: '#e11d48',
-                            radius: 8,
-                            label: {
-                              display: true,
-                              content: '轉折點 (Elbow)',
-                              position: 'top',
-                              color: '#e11d48',
-                              font: { weight: 'bold', size: 14 }
-                            }
-                          }
-                        }
-                      }
-                    },
-                    scales: {
-                      y: {
-                        beginAtZero: true,
-                        title: { display: true, text: '解釋變異比例 (%)', font: { size: 14, weight: 'bold' } },
-                        grid: { color: '#f5f5f4' }
-                      },
-                      x: {
-                        grid: { display: false }
-                      }
+              },
+              annotation: {
+                annotations: {
+                  elbowPoint: {
+                    type: 'point',
+                    xValue: 'PC8',
+                    yValue: 2.1,
+                    backgroundColor: '#e11d48',
+                    radius: 8,
+                    label: {
+                      display: true,
+                      content: 'Elbow',
+                      position: 'top',
+                      color: '#e11d48',
+                      font: { weight: 'bold', size: 14 }
                     }
                   }
-                });
-                
-                function generateCluster(centerX, centerY, centerZ, count, spread) {
-                  let x = [], y = [], z = [];
-                  for(let i=0; i<count; i++) {
-                    x.push(centerX + (Math.random() - 0.5) * spread);
-                    y.push(centerY + (Math.random() - 0.5) * spread);
-                    z.push(centerZ + (Math.random() - 0.5) * spread);
-                  }
-                  return {x, y, z};
                 }
-                
-                const c1 = generateCluster(2, 2, 2, 60, 2);
-                const c2 = generateCluster(-2, -2, 4, 60, 2.5);
-                const c3 = generateCluster(3, -3, -2, 60, 1.5);
-                
-                let isPCA = false;
-                
-                const baseTrace = {
-                  mode: 'markers',
-                  marker: { size: 5, opacity: 0.8 },
-                  type: 'scatter3d'
-                };
-                
-                const dataHighD = [
-                  { ...baseTrace, x: c1.x, y: c1.y, z: c1.z, marker: { ...baseTrace.marker, color: '#0ea5e9' }, name: '細胞群 A' },
-                  { ...baseTrace, x: c2.x, y: c2.y, z: c2.z, marker: { ...baseTrace.marker, color: '#14b8a6' }, name: '細胞群 B' },
-                  { ...baseTrace, x: c3.x, y: c3.y, z: c3.z, marker: { ...baseTrace.marker, color: '#f59e0b' }, name: '細胞群 C' }
-                ];
-                
-                const layoutHighD = {
-                  margin: { l: 0, r: 0, b: 0, t: 0 },
-                  scene: {
-                    xaxis: { title: '基因 X 表現量' },
-                    yaxis: { title: '基因 Y 表現量' },
-                    zaxis: { title: '基因 Z 表現量' }
-                  },
-                  paper_bgcolor: 'rgba(0,0,0,0)',
-                  plot_bgcolor: 'rgba(0,0,0,0)',
-                  showlegend: false
-                };
-                
-                Plotly.newPlot('plotly-container', dataHighD, layoutHighD, {displayModeBar: false});
-                
-                document.getElementById('togglePcaBtn').addEventListener('click', function() {
-                  const btn = this;
-                  if (!isPCA) {
-                    const dataLowD = dataHighD.map(trace => ({
-                      ...trace,
-                      z: trace.z.map(() => 0) 
-                    }));
-                    
-                    const layoutLowD = {
-                      ...layoutHighD,
-                      scene: {
-                        xaxis: { title: 'PC1 (主成分 1)' },
-                        yaxis: { title: 'PC2 (主成分 2)' },
-                        zaxis: { title: '丟棄的雜訊維度', range: [-5, 5], showticklabels: false }
-                      }
-                    };
-                    
-                    Plotly.react('plotly-container', dataLowD, layoutLowD);
-                    btn.innerText = "重置為高維度資料";
-                    btn.classList.replace('bg-sky-600', 'bg-stone-600');
-                    btn.classList.replace('hover:bg-sky-700', 'hover:bg-stone-700');
-                    isPCA = true;
-                  } else {
-                    Plotly.react('plotly-container', dataHighD, layoutHighD);
-                    btn.innerText = "模擬執行 PCA 降維";
-                    btn.classList.replace('bg-stone-600', 'bg-sky-600');
-                    btn.classList.replace('hover:bg-stone-700', 'hover:bg-sky-700');
-                    isPCA = false;
-                  }
-                });
-              });
-            </script>
-              </body>
-              </html>
+              }
+            },
+            scales: {
+              y: {
+                beginAtZero: true,
+                title: { display: true, text: 'Explained Variance (%)', font: { size: 14, weight: 'bold' } },
+                grid: { color: '#f5f5f4' }
+              },
+              x: {
+                grid: { display: false }
+              }
+            }
+          }
+        });
+
+        function generateCluster(centerX, centerY, centerZ, count, spread) {
+          let x = [], y = [], z = [];
+          for (let i = 0; i < count; i++) {
+            x.push(centerX + (Math.random() - 0.5) * spread);
+            y.push(centerY + (Math.random() - 0.5) * spread);
+            z.push(centerZ + (Math.random() - 0.5) * spread);
+          }
+          return {x, y, z};
+        }
+
+        const c1 = generateCluster(2, 2, 2, 60, 2);
+        const c2 = generateCluster(-2, -2, 4, 60, 2.5);
+        const c3 = generateCluster(3, -3, -2, 60, 1.5);
+
+        let isPCA = false;
+
+        const baseTrace = {
+          mode: 'markers',
+          marker: { size: 5, opacity: 0.8 },
+          type: 'scatter3d'
+        };
+
+        const dataHighD = [
+          { ...baseTrace, x: c1.x, y: c1.y, z: c1.z, marker: { ...baseTrace.marker, color: '#0ea5e9' }, name: 'Cell Group A' },
+          { ...baseTrace, x: c2.x, y: c2.y, z: c2.z, marker: { ...baseTrace.marker, color: '#14b8a6' }, name: 'Cell Group B' },
+          { ...baseTrace, x: c3.x, y: c3.y, z: c3.z, marker: { ...baseTrace.marker, color: '#f59e0b' }, name: 'Cell Group C' }
+        ];
+
+        const layoutHighD = {
+          margin: { l: 0, r: 0, b: 0, t: 0 },
+          scene: {
+            xaxis: { title: 'Gene X Expression' },
+            yaxis: { title: 'Gene Y Expression' },
+            zaxis: { title: 'Gene Z Expression' }
+          },
+          paper_bgcolor: 'rgba(0,0,0,0)',
+          plot_bgcolor: 'rgba(0,0,0,0)',
+          showlegend: false
+        };
+
+        Plotly.newPlot('plotly-container', dataHighD, layoutHighD, {displayModeBar: false});
+
+        document.getElementById('togglePcaBtn').addEventListener('click', function() {
+          const btn = this;
+          if (!isPCA) {
+            const dataLowD = dataHighD.map(trace => ({
+              ...trace,
+              z: trace.z.map(() => 0)
+            }));
+
+            const layoutLowD = {
+              ...layoutHighD,
+              scene: {
+                xaxis: { title: 'PC1 (Principal Component 1)' },
+                yaxis: { title: 'PC2 (Principal Component 2)' },
+                zaxis: { title: 'Discarded Noise Dimension', range: [-5, 5], showticklabels: false }
+              }
+            };
+
+            Plotly.react('plotly-container', dataLowD, layoutLowD);
+            btn.innerText = "Reset to High-Dimensional Data";
+            btn.classList.replace('bg-sky-600', 'bg-stone-600');
+            btn.classList.replace('hover:bg-sky-700', 'hover:bg-stone-700');
+            isPCA = true;
+          } else {
+            Plotly.react('plotly-container', dataHighD, layoutHighD);
+            btn.innerText = "Simulate PCA Projection";
+            btn.classList.replace('bg-stone-600', 'bg-sky-600');
+            btn.classList.replace('hover:bg-stone-700', 'hover:bg-sky-700');
+            isPCA = false;
+          }
+        });
+      });
+    </script>
+  </body>
+</html>
