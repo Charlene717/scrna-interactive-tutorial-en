@@ -1,393 +1,421 @@
 <!DOCTYPE html>
-  <html lang="zh-TW">
-    <head>
+<html lang="en">
+  <head>
     <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>scRNA-seq 非線性降維分析互動指南</title>
-        <script src="https://cdn.tailwindcss.com"></script>
-          <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-            <!-- Chosen Palette: Slate (Backgrounds/Text), Teal (UMAP/Primary Accent), Indigo (t-SNE/Secondary Accent), Amber (Highlights) -->
-            <!-- Application Structure Plan: The SPA is structured as an interactive educational dashboard. It starts with a foundational introduction to set the context. The core is an interactive "Algorithm Simulator" section allowing users to toggle between PCA, t-SNE, and UMAP mock visualizations to immediately grasp the practical difference in data topology. Following this are structured, interactive sections (parameter tables, workflow code blocks, and an interactive FAQ for misconceptions) to deepen understanding sequentially. This narrative flow moves from high-level visual understanding to technical implementation and finally to critical interpretation, which is optimal for learning complex bioinformatic concepts. -->
-            <!-- Visualization & Content Choices: 
-            1. Goal: Compare Dimensionality Reduction Algorithms -> Viz: Interactive Scatter Plot (Chart.js) -> Interaction: Buttons to toggle data coordinates (PCA vs t-SNE vs UMAP) -> Justification: Shows the "flattening" and "clustering" effects dynamically rather than using static images. 
-          2. Goal: Organize Parameters & Workflow -> Viz: Styled Tables and Code Blocks -> Interaction: Hover states for readability -> Justification: Clear, structured technical reference. 
-          3. Goal: Clarify Misconceptions -> Viz: Interactive Accordion (HTML/JS) -> Interaction: Click to reveal answers -> Justification: Engages the user to actively question and learn the pitfalls, preventing cognitive overload. 
-          Library/Method: Chart.js (Canvas) for all charts. Tailwind for layout. Vanilla JS for interactions. -->
-            <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
-            <style>
-            @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;600;700&display=swap');
-          body {
-            font-family: 'Noto Sans TC', sans-serif;
-            background-color: #f8fafc;
-          }
-          .chart-container {
-            position: relative;
-            width: 100%;
-            max-width: 900px;
-            margin-left: auto;
-            margin-right: auto;
-            height: 50vh;
-            max-height: 550px;
-            min-height: 350px;
-          }
-          .accordion-content {
-            max-height: 0;
-            overflow: hidden;
-            transition: max-height 0.3s ease-out, padding 0.3s ease;
-          }
-          .accordion-content.active {
-            max-height: 500px;
-          }
-          .custom-scrollbar::-webkit-scrollbar {
-            width: 8px;
-          }
-          .custom-scrollbar::-webkit-scrollbar-track {
-            background: #f1f5f9; 
-              border-radius: 4px;
-          }
-          .custom-scrollbar::-webkit-scrollbar-thumb {
-            background: #cbd5e1; 
-              border-radius: 4px;
-          }
-          .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-            background: #94a3b8; 
-          }
-          </style>
-            </head>
-            <body class="text-slate-800 antialiased leading-relaxed custom-scrollbar">
-            
-            <header class="bg-slate-900 text-white py-16 px-6 shadow-lg relative overflow-hidden">
-            <div class="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none">
-            <div class="absolute w-64 h-64 bg-teal-500 rounded-full blur-3xl -top-10 -left-10"></div>
-            <div class="absolute w-80 h-80 bg-indigo-500 rounded-full blur-3xl bottom-10 right-10"></div>
-            </div>
-            <div class="max-w-5xl mx-auto relative z-10">
-            <div class="inline-block bg-teal-600/20 text-teal-300 px-3 py-1 rounded-full text-sm font-semibold mb-4 border border-teal-500/30">單細胞轉錄組分析 (scRNA-seq)</div>
-            <h1 class="text-4xl md:text-5xl font-bold mb-4 tracking-tight">非線性降維分析互動指南</h1>
-            <p class="text-xl text-slate-300 max-w-2xl">探索 UMAP 與 t-SNE 如何將 20,000 個基因特徵的複雜細胞流形，轉化為直觀的 2D 視覺化圖譜。</p>
-            </div>
-            </header>
-            
-            <main class="max-w-5xl mx-auto px-6 py-12 space-y-20">
-            
-            <section id="introduction" class="bg-white rounded-2xl p-8 shadow-sm border border-slate-100">
-            <h2 class="text-2xl font-bold text-slate-800 mb-4 flex items-center gap-2">
-            <span class="text-teal-600 text-3xl">&#9679;</span> 為什麼需要「非線性」降維？
-            </h2>
-            <p class="mb-6 text-slate-600 text-lg">本區段旨在建立降維分析的核心觀念。在單細胞分析中，我們常面臨極高的資料維度。了解為何傳統線性方法不足，是非線性演算法派上用場的關鍵前提。</p>
-            
-            <div class="grid md:grid-cols-2 gap-6">
-            <div class="bg-slate-50 p-6 rounded-xl border border-slate-200 hover:shadow-md transition-shadow">
-            <h3 class="text-xl font-semibold mb-2 text-slate-700">傳統 PCA (線性) 的局限</h3>
-            <p class="text-slate-600">主成分分析 (PCA) 是標配，但它主要捕捉數據中的<strong class="text-indigo-600">全域差異 (Global variance)</strong>。面對複雜的生物學流形 (Manifold)，PCA 難以將細微的細胞亞群區分開，容易導致資料重疊。</p>
-            </div>
-            <div class="bg-teal-50 p-6 rounded-xl border border-teal-100 hover:shadow-md transition-shadow">
-            <h3 class="text-xl font-semibold mb-2 text-teal-800">非線性降維的優勢</h3>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Guide to Nonlinear Dimensionality Reduction in scRNA-seq</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- Chosen Palette: Slate (Backgrounds/Text), Teal (UMAP/Primary Accent), Indigo (t-SNE/Secondary Accent), Amber (Highlights) -->
+    <!-- Application Structure Plan: The SPA is structured as an interactive educational dashboard. It starts with a foundational introduction to set the context. The core is an interactive "Algorithm Simulator" section allowing users to toggle between PCA, t-SNE, and UMAP mock visualizations to immediately grasp the practical difference in data topology. Following this are structured, interactive sections (parameter tables, workflow code blocks, and an interactive FAQ for misconceptions) to deepen understanding sequentially. This narrative flow moves from high-level visual understanding to technical implementation and finally to critical interpretation, which is optimal for learning complex bioinformatic concepts. -->
+    <!-- Visualization & Content Choices:
+         1. Goal: Compare Dimensionality Reduction Algorithms -> Viz: Interactive Scatter Plot (Chart.js) -> Interaction: Buttons to toggle data coordinates (PCA vs t-SNE vs UMAP) -> Justification: Shows the "flattening" and "clustering" effects dynamically rather than using static images.
+         2. Goal: Organize Parameters & Workflow -> Viz: Styled Tables and Code Blocks -> Interaction: Hover states for readability -> Justification: Clear, structured technical reference.
+         3. Goal: Clarify Misconceptions -> Viz: Interactive Accordion (HTML/JS) -> Interaction: Click to reveal answers -> Justification: Engages the user to actively question and learn the pitfalls, preventing cognitive overload.
+         Library/Method: Chart.js (Canvas) for all charts. Tailwind for layout. Vanilla JS for interactions. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+      body {
+        font-family: 'Inter', sans-serif;
+        background-color: #f8fafc;
+      }
+      .chart-container {
+        position: relative;
+        width: 100%;
+        max-width: 900px;
+        margin-left: auto;
+        margin-right: auto;
+        height: 50vh;
+        max-height: 550px;
+        min-height: 350px;
+      }
+      .accordion-content {
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.3s ease-out, padding 0.3s ease;
+      }
+      .accordion-content.active {
+        max-height: 500px;
+      }
+      .custom-scrollbar::-webkit-scrollbar {
+        width: 8px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-track {
+        background: #f1f5f9;
+        border-radius: 4px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 4px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
+      }
+    </style>
+  </head>
+  <body class="text-slate-800 antialiased leading-relaxed custom-scrollbar">
+
+    <header class="bg-slate-900 text-white py-16 px-6 shadow-lg relative overflow-hidden">
+      <div class="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none">
+        <div class="absolute w-64 h-64 bg-teal-500 rounded-full blur-3xl -top-10 -left-10"></div>
+        <div class="absolute w-80 h-80 bg-indigo-500 rounded-full blur-3xl bottom-10 right-10"></div>
+      </div>
+      <div class="max-w-5xl mx-auto relative z-10">
+        <div class="inline-block bg-teal-600/20 text-teal-300 px-3 py-1 rounded-full text-sm font-semibold mb-4 border border-teal-500/30">
+          Single-Cell Transcriptomics (scRNA-seq)
+        </div>
+        <h1 class="text-4xl md:text-5xl font-bold mb-4 tracking-tight">Interactive Guide to Nonlinear Dimensionality Reduction</h1>
+        <p class="text-xl text-slate-300 max-w-2xl">
+          Explore how UMAP and t-SNE transform the complex cellular manifold defined by more than 20,000 gene features into intuitive two-dimensional visual maps.
+        </p>
+      </div>
+    </header>
+
+    <main class="max-w-5xl mx-auto px-6 py-12 space-y-20">
+
+      <section id="introduction" class="bg-white rounded-2xl p-8 shadow-sm border border-slate-100">
+        <h2 class="text-2xl font-bold text-slate-800 mb-4 flex items-center gap-2">
+          <span class="text-teal-600 text-3xl">&#9679;</span> Why Do We Need “Nonlinear” Dimensionality Reduction?
+        </h2>
+        <p class="mb-6 text-slate-600 text-lg">
+          This section introduces the key conceptual foundation of dimensionality reduction. In single-cell analysis, we routinely work with extremely high-dimensional data. Understanding why linear methods alone are not enough is essential before moving on to nonlinear algorithms.
+        </p>
+
+        <div class="grid md:grid-cols-2 gap-6">
+          <div class="bg-slate-50 p-6 rounded-xl border border-slate-200 hover:shadow-md transition-shadow">
+            <h3 class="text-xl font-semibold mb-2 text-slate-700">Limitations of Traditional PCA (Linear)</h3>
+            <p class="text-slate-600">
+              Principal component analysis (PCA) is a standard preprocessing tool, but it mainly captures <strong class="text-indigo-600">global variance</strong> in the data. When cellular structure follows a complex biological manifold, PCA often struggles to separate subtle subpopulations and may leave biologically distinct cells overlapped in low-dimensional space.
+            </p>
+          </div>
+          <div class="bg-teal-50 p-6 rounded-xl border border-teal-100 hover:shadow-md transition-shadow">
+            <h3 class="text-xl font-semibold mb-2 text-teal-800">Advantages of Nonlinear Dimensionality Reduction</h3>
             <ul class="list-disc pl-5 text-teal-700 space-y-2">
-            <li>保留高維空間中點與點之間的<strong class="font-bold">局部鄰域關係</strong>。</li>
-            <li>能將複雜的非線性結構「攤平」到 2D 平面上，使細胞分群與生物學軌跡一目了然。</li>
+              <li>Preserves <strong class="font-bold">local neighborhood relationships</strong> between cells in high-dimensional space.</li>
+              <li>Can “unfold” complex nonlinear structures into a two-dimensional map, making cellular clusters and biological trajectories much easier to interpret visually.</li>
             </ul>
-            </div>
-            </div>
-            </section>
-            
-            <section id="interactive-comparison" class="bg-white rounded-2xl p-8 shadow-md border-t-4 border-teal-500">
-            <h2 class="text-2xl font-bold text-slate-800 mb-2">演算法對決：視覺化模擬器</h2>
-            <p class="text-slate-600 mb-8">此互動區塊模擬了三種演算法處理相同單細胞數據時的視覺差異。請點擊按鈕切換，觀察細胞群體在不同降維空間中的分佈特性與群間關係。</p>
-            
-            <div class="flex flex-wrap gap-4 mb-6 justify-center">
-            <button id="btn-pca" class="px-6 py-2 rounded-lg font-semibold transition-all bg-slate-200 text-slate-700 hover:bg-slate-300 focus:ring-2 focus:ring-slate-400 focus:outline-none">PCA (線性)</button>
-            <button id="btn-tsne" class="px-6 py-2 rounded-lg font-semibold transition-all bg-indigo-100 text-indigo-700 hover:bg-indigo-200 focus:ring-2 focus:ring-indigo-400 focus:outline-none">t-SNE</button>
-            <button id="btn-umap" class="px-6 py-2 rounded-lg font-semibold transition-all bg-teal-600 text-white hover:bg-teal-700 focus:ring-2 focus:ring-teal-400 focus:outline-none shadow-lg transform scale-105">UMAP (首選)</button>
-            </div>
-            
-            <div class="chart-container bg-slate-50 rounded-xl border border-slate-200 p-2 mb-6">
-            <canvas id="dimChart"></canvas>
-            </div>
-            
-            <div id="algo-description" class="bg-teal-50 border-l-4 border-teal-500 p-6 rounded-r-lg min-h-[140px] flex flex-col justify-center transition-all duration-300">
-            </div>
-            </section>
-            
-            <div class="grid md:grid-cols-2 gap-8">
-            <section id="parameters" class="bg-white rounded-2xl p-8 shadow-sm border border-slate-100">
-            <h2 class="text-2xl font-bold text-slate-800 mb-4">關鍵參數對比</h2>
-            <p class="text-slate-600 mb-6 text-sm">調整這些參數會直接影響降維結果的緊密度與群間距離。了解它們的功能是優化圖譜的關鍵。</p>
-            <div class="overflow-x-auto">
+          </div>
+        </div>
+      </section>
+
+      <section id="interactive-comparison" class="bg-white rounded-2xl p-8 shadow-md border-t-4 border-teal-500">
+        <h2 class="text-2xl font-bold text-slate-800 mb-2">Algorithm Comparison: Interactive Visualization Simulator</h2>
+        <p class="text-slate-600 mb-8">
+          This interactive panel simulates how three different dimensionality reduction methods can represent the same single-cell dataset. Click the buttons below to switch views and compare how each method arranges cell populations and preserves relationships between them.
+        </p>
+
+        <div class="flex flex-wrap gap-4 mb-6 justify-center">
+          <button id="btn-pca" class="px-6 py-2 rounded-lg font-semibold transition-all bg-slate-200 text-slate-700 hover:bg-slate-300 focus:ring-2 focus:ring-slate-400 focus:outline-none">PCA (Linear)</button>
+          <button id="btn-tsne" class="px-6 py-2 rounded-lg font-semibold transition-all bg-indigo-100 text-indigo-700 hover:bg-indigo-200 focus:ring-2 focus:ring-indigo-400 focus:outline-none">t-SNE</button>
+          <button id="btn-umap" class="px-6 py-2 rounded-lg font-semibold transition-all bg-teal-600 text-white hover:bg-teal-700 focus:ring-2 focus:ring-teal-400 focus:outline-none shadow-lg transform scale-105">UMAP (Preferred)</button>
+        </div>
+
+        <div class="chart-container bg-slate-50 rounded-xl border border-slate-200 p-2 mb-6">
+          <canvas id="dimChart"></canvas>
+        </div>
+
+        <div id="algo-description" class="bg-teal-50 border-l-4 border-teal-500 p-6 rounded-r-lg min-h-[140px] flex flex-col justify-center transition-all duration-300">
+        </div>
+      </section>
+
+      <div class="grid md:grid-cols-2 gap-8">
+        <section id="parameters" class="bg-white rounded-2xl p-8 shadow-sm border border-slate-100">
+          <h2 class="text-2xl font-bold text-slate-800 mb-4">Comparison of Key Parameters</h2>
+          <p class="text-slate-600 mb-6 text-sm">
+            These parameters directly influence how tightly cells are grouped and how distances between clusters appear in the final embedding. Understanding them is essential for optimizing the visualization.
+          </p>
+          <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse">
-            <thead>
-            <tr class="bg-slate-100">
-            <th class="p-3 border-b-2 border-slate-200 font-semibold text-slate-700 rounded-tl-lg">參數</th>
-            <th class="p-3 border-b-2 border-slate-200 font-semibold text-indigo-700">t-SNE</th>
-            <th class="p-3 border-b-2 border-slate-200 font-semibold text-teal-700 rounded-tr-lg">UMAP</th>
-            </tr>
-            </thead>
-            <tbody class="text-sm">
-            <tr class="hover:bg-slate-50 transition-colors">
-            <td class="p-3 border-b border-slate-100 font-medium">核心變數</td>
-            <td class="p-3 border-b border-slate-100 bg-indigo-50/30 font-mono text-indigo-600">Perplexity</td>
-            <td class="p-3 border-b border-slate-100 bg-teal-50/30 font-mono text-teal-600">n_neighbors / min_dist</td>
-            </tr>
-            <tr class="hover:bg-slate-50 transition-colors">
-            <td class="p-3 border-b border-slate-100 font-medium">功能影響</td>
-            <td class="p-3 border-b border-slate-100">控制局部與全域結構的平衡。數值越大，考慮的鄰居越多。</td>
-            <td class="p-3 border-b border-slate-100"><code class="bg-slate-100 px-1 rounded text-teal-700">n_neighbors</code> 控制局部結構；<code class="bg-slate-100 px-1 rounded text-teal-700">min_dist</code> 控制點的緊密程度。</td>
-            </tr>
-            <tr class="hover:bg-slate-50 transition-colors">
-            <td class="p-3 border-b border-slate-100 font-medium rounded-bl-lg">建議設定</td>
-            <td class="p-3 border-b border-slate-100 font-bold text-slate-700">30 - 50</td>
-            <td class="p-3 border-b border-slate-100 rounded-br-lg font-bold text-slate-700">15-30 / 0.1-0.3</td>
-            </tr>
-            </tbody>
+              <thead>
+                <tr class="bg-slate-100">
+                  <th class="p-3 border-b-2 border-slate-200 font-semibold text-slate-700 rounded-tl-lg">Parameter</th>
+                  <th class="p-3 border-b-2 border-slate-200 font-semibold text-indigo-700">t-SNE</th>
+                  <th class="p-3 border-b-2 border-slate-200 font-semibold text-teal-700 rounded-tr-lg">UMAP</th>
+                </tr>
+              </thead>
+              <tbody class="text-sm">
+                <tr class="hover:bg-slate-50 transition-colors">
+                  <td class="p-3 border-b border-slate-100 font-medium">Core variables</td>
+                  <td class="p-3 border-b border-slate-100 bg-indigo-50/30 font-mono text-indigo-600">Perplexity</td>
+                  <td class="p-3 border-b border-slate-100 bg-teal-50/30 font-mono text-teal-600">n_neighbors / min_dist</td>
+                </tr>
+                <tr class="hover:bg-slate-50 transition-colors">
+                  <td class="p-3 border-b border-slate-100 font-medium">What they influence</td>
+                  <td class="p-3 border-b border-slate-100">Controls the balance between local and broader structure by effectively adjusting how many neighbors are considered.</td>
+                  <td class="p-3 border-b border-slate-100"><code class="bg-slate-100 px-1 rounded text-teal-700">n_neighbors</code> controls local structure; <code class="bg-slate-100 px-1 rounded text-teal-700">min_dist</code> controls how tightly points are packed in the embedding.</td>
+                </tr>
+                <tr class="hover:bg-slate-50 transition-colors">
+                  <td class="p-3 border-b border-slate-100 font-medium rounded-bl-lg">Typical settings</td>
+                  <td class="p-3 border-b border-slate-100 font-bold text-slate-700">30–50</td>
+                  <td class="p-3 border-b border-slate-100 rounded-br-lg font-bold text-slate-700">15–30 / 0.1–0.3</td>
+                </tr>
+              </tbody>
             </table>
-            </div>
-            </section>
-            
-            <section id="workflow" class="bg-white rounded-2xl p-8 shadow-sm border border-slate-100">
-            <h2 class="text-2xl font-bold text-slate-800 mb-4">實戰流程 (R 語言 Seurat)</h2>
-            <p class="text-slate-600 mb-4 text-sm">提供標準的分析代碼流程。注意：在運行非線性降維之前，<strong class="text-rose-500">必須</strong>先運行 PCA 以去噪並加速運算。</p>
-            
-            <div class="bg-slate-900 rounded-xl p-4 overflow-x-auto shadow-inner">
-            <pre class="text-emerald-400 font-mono text-sm leading-relaxed">
-            <span class="text-slate-400"># 假設已完成標準化與高變異基因篩選</span>
-            <span class="text-slate-400"># 1. 運行 PCA (線性降維)</span>
-            pbmc <- RunPCA(pbmc, features = VariableFeatures(object = pbmc))
-          
-          <span class="text-slate-400"># 2. 選擇主成分數量 (例如前 20 個 PC)</span>
-            <span class="text-slate-400"># 3. 運行 UMAP (推薦)</span>
-            pbmc <- <span class="text-blue-300">RunUMAP</span>(pbmc, dims = 1:20)
-          
-          <span class="text-slate-400"># 4. 運行 t-SNE (可選)</span>
-            pbmc <- <span class="text-blue-300">RunTSNE</span>(pbmc, dims = 1:20)
-          
-          <span class="text-slate-400"># 5. 視覺化</span>
-            DimPlot(pbmc, reduction = <span class="text-amber-300">"umap"</span>, label = TRUE)
-          </pre>
-            </div>
-            </section>
-            </div>
-            
-            <section id="misconceptions" class="bg-white rounded-2xl p-8 shadow-sm border border-slate-100">
-            <h2 class="text-2xl font-bold text-slate-800 mb-4">常見誤區與注意事項</h2>
-            <p class="text-slate-600 mb-6">點擊下方問題展開詳細解說，避免在解讀降維圖表時產生常見的生物學誤判。</p>
-            
-            <div class="space-y-4" id="accordion-container">
-            <div class="border border-slate-200 rounded-lg overflow-hidden">
-            <button class="accordion-btn w-full text-left px-6 py-4 bg-slate-50 hover:bg-slate-100 font-semibold text-slate-700 flex justify-between items-center transition-colors focus:outline-none">
-            <span>1. 坐標軸代表什麼物理意義？</span>
-            <span class="text-xl transform transition-transform duration-300 icon">+</span>
-            </button>
-            <div class="accordion-content bg-white px-6">
-            <p class="py-4 text-slate-600">UMAP1 或 tSNE1 軸本身<strong class="text-rose-500">沒有明確的物理或生物學意義</strong>。這與 PCA 完全不同（PCA 的 PC1 代表數據中最大的變異方向）。它們只是用來將點散佈在 2D 空間中的相對座標。</p>
-            </div>
-            </div>
-            
-            <div class="border border-slate-200 rounded-lg overflow-hidden">
-            <button class="accordion-btn w-full text-left px-6 py-4 bg-slate-50 hover:bg-slate-100 font-semibold text-slate-700 flex justify-between items-center transition-colors focus:outline-none">
-            <span>2. 可以用群之間的距離來衡量生物學相似度嗎？</span>
-            <span class="text-xl transform transition-transform duration-300 icon">+</span>
-            </button>
-            <div class="accordion-content bg-white px-6">
-            <p class="py-4 text-slate-600">在 <strong class="text-indigo-600">t-SNE</strong> 中，兩個遠處分群之間的距離通常<strong class="font-bold">沒有意義</strong>，它通常會丟失全域結構。而在 <strong class="text-teal-600">UMAP</strong> 中，雖然相對距離（全域結構）保留得較好，更具生物學意義（如發育路徑），但仍應謹慎解讀，不宜直接量化絕對距離。</p>
-            </div>
-            </div>
-            
-            <div class="border border-slate-200 rounded-lg overflow-hidden">
-            <button class="accordion-btn w-full text-left px-6 py-4 bg-slate-50 hover:bg-slate-100 font-semibold text-slate-700 flex justify-between items-center transition-colors focus:outline-none">
-            <span>3. 群的面積大小代表細胞的異質性嗎？</span>
-            <span class="text-xl transform transition-transform duration-300 icon">+</span>
-            </button>
-            <div class="accordion-content bg-white px-6">
-            <p class="py-4 text-slate-600">不一定。分群的視覺大小（點的分佈密度）很大程度上受到演算法設定參數（如 min_dist 或 perplexity）的影響，<strong class="font-bold">並不一定代表該群細胞內部的實際轉錄組異質性程度</strong>。</p>
-            </div>
-            </div>
-            
-            <div class="border border-slate-200 rounded-lg overflow-hidden">
-            <button class="accordion-btn w-full text-left px-6 py-4 bg-slate-50 hover:bg-slate-100 font-semibold text-slate-700 flex justify-between items-center transition-colors focus:outline-none">
-            <span>4. 非線性降維是直接用所有基因去跑的嗎？</span>
-            <span class="text-xl transform transition-transform duration-300 icon">+</span>
-            </button>
-            <div class="accordion-content bg-white px-6">
-            <p class="py-4 text-slate-600">不是。非線性降維通常是在 <strong class="font-bold">PCA 的空間</strong>（例如前 20-30 個主要成分）上運行，而不是直接在原始的 20,000 個基因上運行。這有助於消除雜訊並大幅提升運算效率。</p>
-            </div>
-            </div>
-            </div>
-            </section>
-            </main>
-            
-            <footer class="bg-slate-800 text-slate-400 py-12 text-center mt-12">
-            <div class="max-w-3xl mx-auto px-6">
-            <h3 class="text-white text-xl font-semibold mb-4">分析策略總結</h3>
-            <div class="grid grid-cols-2 gap-4 text-left">
-            <div class="bg-slate-700/50 p-4 rounded-lg">
-            <span class="block text-indigo-300 font-bold mb-1">使用 t-SNE</span>
-            目標是清晰地劃分、展示已知的離散細胞類型。
           </div>
-            <div class="bg-teal-900/40 p-4 rounded-lg border border-teal-700/50">
-            <span class="block text-teal-300 font-bold mb-1">使用 UMAP (推薦)</span>
-            數據包含發育軌跡、連續狀態，或細胞數量巨大時。
+        </section>
+
+        <section id="workflow" class="bg-white rounded-2xl p-8 shadow-sm border border-slate-100">
+          <h2 class="text-2xl font-bold text-slate-800 mb-4">Practical Workflow (Seurat in R)</h2>
+          <p class="text-slate-600 mb-4 text-sm">
+            Below is a standard analysis workflow. Note that before running nonlinear dimensionality reduction, you <strong class="text-rose-500">must</strong> first run PCA to denoise the data and improve computational efficiency.
+          </p>
+
+          <div class="bg-slate-900 rounded-xl p-4 overflow-x-auto shadow-inner">
+<pre class="text-emerald-400 font-mono text-sm leading-relaxed">
+<span class="text-slate-400"># Assume normalization and highly variable gene selection are already done</span>
+<span class="text-slate-400"># 1. Run PCA (linear dimensionality reduction)</span>
+pbmc <- RunPCA(pbmc, features = VariableFeatures(object = pbmc))
+
+<span class="text-slate-400"># 2. Choose the number of principal components (for example, the first 20 PCs)</span>
+<span class="text-slate-400"># 3. Run UMAP (recommended)</span>
+pbmc <- <span class="text-blue-300">RunUMAP</span>(pbmc, dims = 1:20)
+
+<span class="text-slate-400"># 4. Run t-SNE (optional)</span>
+pbmc <- <span class="text-blue-300">RunTSNE</span>(pbmc, dims = 1:20)
+
+<span class="text-slate-400"># 5. Visualize</span>
+DimPlot(pbmc, reduction = <span class="text-amber-300">"umap"</span>, label = TRUE)
+</pre>
           </div>
+        </section>
+      </div>
+
+      <section id="misconceptions" class="bg-white rounded-2xl p-8 shadow-sm border border-slate-100">
+        <h2 class="text-2xl font-bold text-slate-800 mb-4">Common Misconceptions and Important Caveats</h2>
+        <p class="text-slate-600 mb-6">
+          Click each question below to expand the explanation and avoid common interpretive mistakes when reading nonlinear embeddings.
+        </p>
+
+        <div class="space-y-4" id="accordion-container">
+          <div class="border border-slate-200 rounded-lg overflow-hidden">
+            <button class="accordion-btn w-full text-left px-6 py-4 bg-slate-50 hover:bg-slate-100 font-semibold text-slate-700 flex justify-between items-center transition-colors focus:outline-none">
+              <span>1. Do the axes have a direct physical or biological meaning?</span>
+              <span class="text-xl transform transition-transform duration-300 icon">+</span>
+            </button>
+            <div class="accordion-content bg-white px-6">
+              <p class="py-4 text-slate-600">
+                No. Axes such as UMAP1 or tSNE1 <strong class="text-rose-500">do not have a direct physical or biological interpretation</strong>. This is very different from PCA, where PC1 has a defined meaning as the direction of greatest variance. In UMAP and t-SNE, the axes are simply coordinates used to arrange points in two-dimensional space.
+              </p>
             </div>
-            <p class="mt-8 text-sm opacity-70">數據視覺化應作為輔助理解的工具，最終的生物學結論需依賴基因表現矩陣與實驗驗證。</p>
+          </div>
+
+          <div class="border border-slate-200 rounded-lg overflow-hidden">
+            <button class="accordion-btn w-full text-left px-6 py-4 bg-slate-50 hover:bg-slate-100 font-semibold text-slate-700 flex justify-between items-center transition-colors focus:outline-none">
+              <span>2. Can the distance between clusters be interpreted as biological similarity?</span>
+              <span class="text-xl transform transition-transform duration-300 icon">+</span>
+            </button>
+            <div class="accordion-content bg-white px-6">
+              <p class="py-4 text-slate-600">
+                In <strong class="text-indigo-600">t-SNE</strong>, the distance between distant clusters is often <strong class="font-bold">not meaningful</strong>, because global structure is typically not preserved. In <strong class="text-teal-600">UMAP</strong>, relative distances are usually more informative and may better reflect developmental continua or broader topology, but even there, absolute distance should still be interpreted cautiously.
+              </p>
             </div>
-            </footer>
-            
-            <script>
-            const randomGaussian = (mean, stdev) => {
-              let u = 1 - Math.random(); 
-              let v = Math.random();
-              let z = Math.sqrt( -2.0 * Math.log( u ) ) * Math.cos( 2.0 * Math.PI * v );
-              return z * stdev + mean;
-            };
-          
-          const generateCluster = (cx, cy, stdDev, count) => {
-            return Array.from({length: count}, () => ({
-              x: randomGaussian(cx, stdDev),
-              y: randomGaussian(cy, stdDev)
-            }));
+          </div>
+
+          <div class="border border-slate-200 rounded-lg overflow-hidden">
+            <button class="accordion-btn w-full text-left px-6 py-4 bg-slate-50 hover:bg-slate-100 font-semibold text-slate-700 flex justify-between items-center transition-colors focus:outline-none">
+              <span>3. Does the visual area of a cluster reflect its internal heterogeneity?</span>
+              <span class="text-xl transform transition-transform duration-300 icon">+</span>
+            </button>
+            <div class="accordion-content bg-white px-6">
+              <p class="py-4 text-slate-600">
+                Not necessarily. The apparent size or spread of a cluster in the plot is strongly influenced by the algorithm and its parameters, such as <code>min_dist</code> or <code>perplexity</code>. It does <strong class="font-bold">not automatically represent the true degree of transcriptomic heterogeneity within that cell population</strong>.
+              </p>
+            </div>
+          </div>
+
+          <div class="border border-slate-200 rounded-lg overflow-hidden">
+            <button class="accordion-btn w-full text-left px-6 py-4 bg-slate-50 hover:bg-slate-100 font-semibold text-slate-700 flex justify-between items-center transition-colors focus:outline-none">
+              <span>4. Are nonlinear embeddings run directly on all genes?</span>
+              <span class="text-xl transform transition-transform duration-300 icon">+</span>
+            </button>
+            <div class="accordion-content bg-white px-6">
+              <p class="py-4 text-slate-600">
+                No. In most workflows, nonlinear dimensionality reduction is performed in <strong class="font-bold">PCA space</strong>, for example using the first 20–30 principal components, rather than directly on the original matrix of 20,000 genes. This greatly reduces noise and improves computational efficiency.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="bg-slate-800 text-slate-400 py-12 text-center mt-12">
+      <div class="max-w-3xl mx-auto px-6">
+        <h3 class="text-white text-xl font-semibold mb-4">Practical Summary</h3>
+        <div class="grid grid-cols-2 gap-4 text-left">
+          <div class="bg-slate-700/50 p-4 rounded-lg">
+            <span class="block text-indigo-300 font-bold mb-1">Use t-SNE</span>
+            When the main goal is to separate and display clearly defined, discrete cell types.
+          </div>
+          <div class="bg-teal-900/40 p-4 rounded-lg border border-teal-700/50">
+            <span class="block text-teal-300 font-bold mb-1">Use UMAP (Recommended)</span>
+            When the data include developmental trajectories, continuous cellular states, or very large numbers of cells.
+          </div>
+        </div>
+        <p class="mt-8 text-sm opacity-70">
+          Visualization should be treated as a tool for interpretation, not as the final proof. Biological conclusions must ultimately rely on the gene expression matrix and independent experimental validation.
+        </p>
+      </div>
+    </footer>
+
+    <script>
+      const randomGaussian = (mean, stdev) => {
+        let u = 1 - Math.random();
+        let v = Math.random();
+        let z = Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+        return z * stdev + mean;
+      };
+
+      const generateCluster = (cx, cy, stdDev, count) => {
+        return Array.from({length: count}, () => ({
+          x: randomGaussian(cx, stdDev),
+          y: randomGaussian(cy, stdDev)
+        }));
+      };
+
+      const generateElongatedCluster = (cx, cy, count, slope, length, width) => {
+        return Array.from({length: count}, () => {
+          const t = (Math.random() - 0.5) * length;
+          const o = randomGaussian(0, width);
+          return {
+            x: cx + t + o * -slope,
+            y: cy + t * slope + o
           };
-          
-          const generateElongatedCluster = (cx, cy, count, slope, length, width) => {
-            return Array.from({length: count}, () => {
-              const t = (Math.random() - 0.5) * length;
-              const o = randomGaussian(0, width);
-              return {
-                x: cx + t + o * -slope,
-                y: cy + t * slope + o
-              };
-            });
-          };
-          
-          const colors = {
-            tcell: 'rgba(56, 189, 248, 0.7)', 
-            bcell: 'rgba(167, 139, 250, 0.7)', 
-            mono: 'rgba(251, 146, 60, 0.7)'    
-          };
-          
-          const pcaData = {
-            datasets: [
-              { label: 'T Cells', data: generateCluster(0, 0, 4, 150), backgroundColor: colors.tcell, pointRadius: 3 },
-              { label: 'B Cells', data: generateCluster(3, -2, 4.5, 120), backgroundColor: colors.bcell, pointRadius: 3 },
-              { label: 'Monocytes', data: generateCluster(-2, 3, 5, 100), backgroundColor: colors.mono, pointRadius: 3 }
-            ]
-          };
-          
-          const tsneData = {
-            datasets: [
-              { label: 'T Cells', data: generateCluster(15, 15, 1.5, 150), backgroundColor: colors.tcell, pointRadius: 3 },
-              { label: 'B Cells', data: generateCluster(-15, -10, 1.2, 120), backgroundColor: colors.bcell, pointRadius: 3 },
-              { label: 'Monocytes', data: generateCluster(5, -20, 1.8, 100), backgroundColor: colors.mono, pointRadius: 3 }
-            ]
-          };
-          
-          const umapData = {
-            datasets: [
-              { label: 'T Cells', data: generateElongatedCluster(-5, 5, 150, 0.5, 8, 1), backgroundColor: colors.tcell, pointRadius: 3 },
-              { label: 'B Cells', data: generateCluster(5, 5, 1.5, 120), backgroundColor: colors.bcell, pointRadius: 3 },
-              { label: 'Monocytes', data: generateElongatedCluster(-1, -1, 100, 1.5, 6, 0.8), backgroundColor: colors.mono, pointRadius: 3 }
-            ]
-          };
-          
-          const descriptions = {
-            pca: "<h3 class='text-lg font-bold text-slate-800 mb-2'>PCA (線性降維) 視角</h3><p class='text-slate-700'>保留了整體最大的變異，但各個細胞群落相互重疊，無法有效區分細微的亞群差異。適合做為後續非線性降維的預處理步驟。</p>",
-            tsne: "<h3 class='text-lg font-bold text-indigo-800 mb-2'>t-SNE 視角</h3><p class='text-indigo-900'><strong>局部性極強！</strong>成功將不同細胞類型切分成乾淨的「孤島」。缺點是孤島之間的距離沒有實質意義，丟失了發育軌跡等全域結構。</p>",
-            umap: "<h3 class='text-lg font-bold text-teal-800 mb-2'>UMAP 視角 (目前主流)</h3><p class='text-teal-900'>在清晰劃分細胞群落的同時，保留了更好的<strong>全域拓撲結構</strong>。圖中相鄰或具連續性的群體，可能暗示著真實的生物學發育路徑或相似性。</p>"
-          };
-          
-          const ctx = document.getElementById('dimChart').getContext('2d');
-          let chart = new Chart(ctx, {
-            type: 'scatter',
-            data: umapData,
-            options: {
-              responsive: true,
-              maintainAspectRatio: false,
-              animation: {
-                duration: 800,
-                easing: 'easeOutQuart'
-              },
-              scales: {
-                x: { ticks: { display: false }, grid: { display: false } },
-                y: { ticks: { display: false }, grid: { display: false } }
-              },
-              plugins: {
-                legend: {
-                  position: 'top',
-                  labels: { usePointStyle: true, boxWidth: 8 }
-                },
-                tooltip: {
-                  callbacks: {
-                    label: function(context) {
-                      return context.dataset.label;
-                    }
-                  }
+        });
+      };
+
+      const colors = {
+        tcell: 'rgba(56, 189, 248, 0.7)',
+        bcell: 'rgba(167, 139, 250, 0.7)',
+        mono: 'rgba(251, 146, 60, 0.7)'
+      };
+
+      const pcaData = {
+        datasets: [
+          { label: 'T Cells', data: generateCluster(0, 0, 4, 150), backgroundColor: colors.tcell, pointRadius: 3 },
+          { label: 'B Cells', data: generateCluster(3, -2, 4.5, 120), backgroundColor: colors.bcell, pointRadius: 3 },
+          { label: 'Monocytes', data: generateCluster(-2, 3, 5, 100), backgroundColor: colors.mono, pointRadius: 3 }
+        ]
+      };
+
+      const tsneData = {
+        datasets: [
+          { label: 'T Cells', data: generateCluster(15, 15, 1.5, 150), backgroundColor: colors.tcell, pointRadius: 3 },
+          { label: 'B Cells', data: generateCluster(-15, -10, 1.2, 120), backgroundColor: colors.bcell, pointRadius: 3 },
+          { label: 'Monocytes', data: generateCluster(5, -20, 1.8, 100), backgroundColor: colors.mono, pointRadius: 3 }
+        ]
+      };
+
+      const umapData = {
+        datasets: [
+          { label: 'T Cells', data: generateElongatedCluster(-5, 5, 150, 0.5, 8, 1), backgroundColor: colors.tcell, pointRadius: 3 },
+          { label: 'B Cells', data: generateCluster(5, 5, 1.5, 120), backgroundColor: colors.bcell, pointRadius: 3 },
+          { label: 'Monocytes', data: generateElongatedCluster(-1, -1, 100, 1.5, 6, 0.8), backgroundColor: colors.mono, pointRadius: 3 }
+        ]
+      };
+
+      const descriptions = {
+        pca: "<h3 class='text-lg font-bold text-slate-800 mb-2'>PCA (Linear Dimensionality Reduction) View</h3><p class='text-slate-700'>PCA preserves the largest sources of global variance, but the cell populations still overlap substantially. This makes it difficult to distinguish subtle subpopulations. In practice, PCA is best used as a preprocessing step before nonlinear dimensionality reduction.</p>",
+        tsne: "<h3 class='text-lg font-bold text-indigo-800 mb-2'>t-SNE View</h3><p class='text-indigo-900'><strong>Very strong local separation.</strong> Distinct cell types are cleanly separated into isolated islands. The limitation is that the distances between islands usually do not carry meaningful global information, so developmental or continuum-like relationships may be lost.</p>",
+        umap: "<h3 class='text-lg font-bold text-teal-800 mb-2'>UMAP View (Current Mainstream Choice)</h3><p class='text-teal-900'>UMAP separates cell populations clearly while preserving more of the <strong>global topological structure</strong>. Neighboring or continuous groups may therefore suggest meaningful biological trajectories or broader similarities between states.</p>"
+      };
+
+      const ctx = document.getElementById('dimChart').getContext('2d');
+      let chart = new Chart(ctx, {
+        type: 'scatter',
+        data: umapData,
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: {
+            duration: 800,
+            easing: 'easeOutQuart'
+          },
+          scales: {
+            x: { ticks: { display: false }, grid: { display: false } },
+            y: { ticks: { display: false }, grid: { display: false } }
+          },
+          plugins: {
+            legend: {
+              position: 'top',
+              labels: { usePointStyle: true, boxWidth: 8 }
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  return context.dataset.label;
                 }
               }
             }
+          }
+        }
+      });
+
+      const btnPca = document.getElementById('btn-pca');
+      const btnTsne = document.getElementById('btn-tsne');
+      const btnUmap = document.getElementById('btn-umap');
+      const descBox = document.getElementById('algo-description');
+
+      const resetButtons = () => {
+        btnPca.className = "px-6 py-2 rounded-lg font-semibold transition-all bg-slate-200 text-slate-700 hover:bg-slate-300 focus:ring-2 focus:ring-slate-400 focus:outline-none";
+        btnTsne.className = "px-6 py-2 rounded-lg font-semibold transition-all bg-slate-200 text-slate-700 hover:bg-slate-300 focus:ring-2 focus:ring-indigo-400 focus:outline-none";
+        btnUmap.className = "px-6 py-2 rounded-lg font-semibold transition-all bg-slate-200 text-slate-700 hover:bg-slate-300 focus:ring-2 focus:ring-teal-400 focus:outline-none";
+        descBox.className = "p-6 rounded-r-lg min-h-[140px] flex flex-col justify-center transition-all duration-300";
+      };
+
+      const updateView = (type) => {
+        resetButtons();
+        if (type === 'pca') {
+          chart.data = pcaData;
+          btnPca.classList.add('bg-slate-600', 'text-white', 'shadow-lg', 'transform', 'scale-105');
+          btnPca.classList.remove('bg-slate-200', 'text-slate-700', 'hover:bg-slate-300');
+          descBox.classList.add('bg-slate-100', 'border-l-4', 'border-slate-500');
+          descBox.innerHTML = descriptions.pca;
+        } else if (type === 'tsne') {
+          chart.data = tsneData;
+          btnTsne.classList.add('bg-indigo-600', 'text-white', 'shadow-lg', 'transform', 'scale-105');
+          btnTsne.classList.remove('bg-slate-200', 'text-slate-700', 'hover:bg-slate-300');
+          descBox.classList.add('bg-indigo-50', 'border-l-4', 'border-indigo-500');
+          descBox.innerHTML = descriptions.tsne;
+        } else {
+          chart.data = umapData;
+          btnUmap.classList.add('bg-teal-600', 'text-white', 'shadow-lg', 'transform', 'scale-105');
+          btnUmap.classList.remove('bg-slate-200', 'text-slate-700', 'hover:bg-slate-300');
+          descBox.classList.add('bg-teal-50', 'border-l-4', 'border-teal-500');
+          descBox.innerHTML = descriptions.umap;
+        }
+        chart.update();
+      };
+
+      btnPca.addEventListener('click', () => updateView('pca'));
+      btnTsne.addEventListener('click', () => updateView('tsne'));
+      btnUmap.addEventListener('click', () => updateView('umap'));
+
+      updateView('umap');
+
+      const accordions = document.querySelectorAll('.accordion-btn');
+      accordions.forEach(btn => {
+        btn.addEventListener('click', function() {
+          const content = this.nextElementSibling;
+          const icon = this.querySelector('.icon');
+
+          const isActive = content.classList.contains('active');
+
+          document.querySelectorAll('.accordion-content').forEach(c => {
+            c.classList.remove('active');
+            c.style.paddingTop = '0';
+            c.style.paddingBottom = '0';
           });
-          
-          const btnPca = document.getElementById('btn-pca');
-          const btnTsne = document.getElementById('btn-tsne');
-          const btnUmap = document.getElementById('btn-umap');
-          const descBox = document.getElementById('algo-description');
-          
-          const resetButtons = () => {
-            btnPca.className = "px-6 py-2 rounded-lg font-semibold transition-all bg-slate-200 text-slate-700 hover:bg-slate-300 focus:ring-2 focus:ring-slate-400 focus:outline-none";
-            btnTsne.className = "px-6 py-2 rounded-lg font-semibold transition-all bg-slate-200 text-slate-700 hover:bg-slate-300 focus:ring-2 focus:ring-indigo-400 focus:outline-none";
-            btnUmap.className = "px-6 py-2 rounded-lg font-semibold transition-all bg-slate-200 text-slate-700 hover:bg-slate-300 focus:ring-2 focus:ring-teal-400 focus:outline-none";
-            descBox.className = "p-6 rounded-r-lg min-h-[140px] flex flex-col justify-center transition-all duration-300";
-          };
-          
-          const updateView = (type) => {
-            resetButtons();
-            if (type === 'pca') {
-              chart.data = pcaData;
-              btnPca.classList.add('bg-slate-600', 'text-white', 'shadow-lg', 'transform', 'scale-105');
-              btnPca.classList.remove('bg-slate-200', 'text-slate-700', 'hover:bg-slate-300');
-              descBox.classList.add('bg-slate-100', 'border-l-4', 'border-slate-500');
-              descBox.innerHTML = descriptions.pca;
-            } else if (type === 'tsne') {
-              chart.data = tsneData;
-              btnTsne.classList.add('bg-indigo-600', 'text-white', 'shadow-lg', 'transform', 'scale-105');
-              btnTsne.classList.remove('bg-slate-200', 'text-slate-700', 'hover:bg-slate-300');
-              descBox.classList.add('bg-indigo-50', 'border-l-4', 'border-indigo-500');
-              descBox.innerHTML = descriptions.tsne;
-            } else {
-              chart.data = umapData;
-              btnUmap.classList.add('bg-teal-600', 'text-white', 'shadow-lg', 'transform', 'scale-105');
-              btnUmap.classList.remove('bg-slate-200', 'text-slate-700', 'hover:bg-slate-300');
-              descBox.classList.add('bg-teal-50', 'border-l-4', 'border-teal-500');
-              descBox.innerHTML = descriptions.umap;
-            }
-            chart.update();
-          };
-          
-          btnPca.addEventListener('click', () => updateView('pca'));
-          btnTsne.addEventListener('click', () => updateView('tsne'));
-          btnUmap.addEventListener('click', () => updateView('umap'));
-          
-          updateView('umap');
-          
-          const accordions = document.querySelectorAll('.accordion-btn');
-          accordions.forEach(btn => {
-            btn.addEventListener('click', function() {
-              const content = this.nextElementSibling;
-              const icon = this.querySelector('.icon');
-              
-              const isActive = content.classList.contains('active');
-              
-              document.querySelectorAll('.accordion-content').forEach(c => {
-                c.classList.remove('active');
-                c.style.paddingTop = '0';
-                c.style.paddingBottom = '0';
-              });
-              document.querySelectorAll('.icon').forEach(i => i.textContent = '+');
-              
-              if (!isActive) {
-                content.classList.add('active');
-                icon.textContent = '−';
-              }
-            });
-          });
-          </script>
-            </body>
-            </html>
+          document.querySelectorAll('.icon').forEach(i => i.textContent = '+');
+
+          if (!isActive) {
+            content.classList.add('active');
+            icon.textContent = '−';
+          }
+        });
+      });
+    </script>
+  </body>
+</html>
